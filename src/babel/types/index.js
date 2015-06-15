@@ -28,7 +28,7 @@ function registerType(type: string, skipAliasCheck?: boolean) {
 
 function isTypeNew(aliases, type, node, opts){
   if (typeof node !== 'object' || !node) return false;
-  if (type !== node.type && (!aliases || !aliases[node.type])) return false;
+  if (type !== node.type && (!aliases || !aliases.has(node.type))) return false;
 
   return typeof opts === "undefined" || t.shallowEqual(node, opts);
 }
@@ -68,11 +68,11 @@ export const TYPES = Object.keys(t.VISITOR_KEYS).concat(Object.keys(t.FLIPPED_AL
 
 const FLIPPED_ALIAS_KEYS_OBJECTS = {};
 Object.keys(t.FLIPPED_ALIAS_KEYS).forEach(function(alias){
-  var types = FLIPPED_ALIAS_KEYS_OBJECTS[alias] = {};
-  types[alias] = true;
+  var types = FLIPPED_ALIAS_KEYS_OBJECTS[alias] = new Set();
+  types.add(alias);
 
   t.FLIPPED_ALIAS_KEYS[alias].forEach(function(type){
-    types[type] = true;
+    types.add(type);
   });
 });
 

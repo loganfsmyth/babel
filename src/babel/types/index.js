@@ -12,8 +12,10 @@ var t = exports;
  */
 
 function registerType(type: string, skipAliasCheck?: boolean) {
+  var typeAliases = FLIPPED_ALIAS_KEYS_OBJECTS[type];
+
   var is = t[`is${type}`] = function (node, opts) {
-    return t.is(type, node, opts, skipAliasCheck);
+    return isTypeNew(typeAliases, type, node, opts);
   };
 
   t[`assert${type}`] = function (node, opts) {
@@ -22,6 +24,13 @@ function registerType(type: string, skipAliasCheck?: boolean) {
       throw new Error(`Expected type ${JSON.stringify(type)} with option ${JSON.stringify(opts)}`);
     }
   };
+}
+
+function isTypeNew(aliases, type, node, opts){
+  if (typeof node !== 'object' || !node) return false;
+  if (type !== node.type && (!aliases || !aliases[node.type])) return false;
+
+  return typeof opts === "undefined" || t.shallowEqual(node, opts);
 }
 
 export const STATEMENT_OR_BLOCK_KEYS = ["consequent", "body", "alternate"];
@@ -44,10 +53,6 @@ export const ALIAS_KEYS   = require("./alias-keys");
 
 t.FLIPPED_ALIAS_KEYS = {};
 
-each(t.VISITOR_KEYS, function (keys, type) {
-  registerType(type, true);
-});
-
 each(t.ALIAS_KEYS, function (aliases, type) {
   each(aliases, function (alias) {
     var types = t.FLIPPED_ALIAS_KEYS[alias] = t.FLIPPED_ALIAS_KEYS[alias] || [];
@@ -57,10 +62,27 @@ each(t.ALIAS_KEYS, function (aliases, type) {
 
 each(t.FLIPPED_ALIAS_KEYS, function (types, type) {
   t[type.toUpperCase() + "_TYPES"] = types;
-  registerType(type, false);
 });
 
 export const TYPES = Object.keys(t.VISITOR_KEYS).concat(Object.keys(t.FLIPPED_ALIAS_KEYS));
+
+const FLIPPED_ALIAS_KEYS_OBJECTS = {};
+Object.keys(t.FLIPPED_ALIAS_KEYS).forEach(function(alias){
+  var types = FLIPPED_ALIAS_KEYS_OBJECTS[alias] = {};
+  types[alias] = true;
+
+  t.FLIPPED_ALIAS_KEYS[alias].forEach(function(type){
+    types[type] = true;
+  });
+});
+
+each(t.VISITOR_KEYS, function (keys, type) {
+  registerType(type, true);
+});
+
+each(t.FLIPPED_ALIAS_KEYS, function (types, type) {
+  registerType(type, false);
+});
 
 /**
  * Returns whether `node` is of given `type`.

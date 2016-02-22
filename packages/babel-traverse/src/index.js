@@ -29,7 +29,7 @@ export default function traverse(
 
   visitors.explode(opts);
 
-  traverse.node(parent, opts, scope, state, parentPath);
+  traverse.node(parent, opts, scope, state, parentPath, null, true);
 }
 
 traverse.visitors = visitors;
@@ -61,11 +61,11 @@ traverse.cheap = function (node, enter) {
   }
 };
 
-traverse.node = function (node: Object, opts: Object, scope: Object, state: Object, parentPath: Object, skipKeys?) {
+traverse.node = function (node: Object, opts: Object, scope: Object, state: Object, parentPath: Object, skipKeys?, root) {
   let keys: Array = t.VISITOR_KEYS[node.type];
   if (!keys) return;
 
-  let context = new TraversalContext(scope, opts, state, parentPath);
+  let context = new TraversalContext(scope, opts, state, parentPath, root);
   for (let key of keys) {
     if (skipKeys && skipKeys[key]) continue;
     if (context.visit(node, key)) return;

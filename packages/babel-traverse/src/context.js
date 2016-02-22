@@ -4,11 +4,12 @@ import * as t from "babel-types";
 let testing = process.env.NODE_ENV === "test";
 
 export default class TraversalContext {
-  constructor(scope, opts, state, parentPath) {
+  constructor(scope, opts, state, parentPath, root) {
     this.parentPath = parentPath;
     this.scope      = scope;
     this.state      = state;
     this.opts       = opts;
+    this.root       = (!root && parentPath && parentPath.context) ? parentPath.context.root : this;
   }
 
   parentPath: NodePath;

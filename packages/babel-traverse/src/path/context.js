@@ -219,11 +219,26 @@ export function requeue(pathToQueue = this) {
 }
 
 export function _getQueueContexts(){
-  let path = this;
-  let contexts = this.contexts;
-  while (!contexts.length) {
-    path = path.parentPath;
-    contexts = path.contexts;
+  let ctxs = [];
+
+  for (let path = this; path; path = path.parentPath){
+    if (path.contexts.length > 0){
+      ctxs = path.contexts;
+      break;
+    }
   }
-  return contexts;
+
+
+
+  const contexts = new Map();
+
+  for (let path = this; path; path = path.parentPath){
+    for (const context of path.contexts){
+      if (!contexts.has(context.root)) contexts.set(context.root, context);
+    }
+  }
+
+  let ctxs2 = Array.from(contexts.values());
+
+  return ctxs;
 }

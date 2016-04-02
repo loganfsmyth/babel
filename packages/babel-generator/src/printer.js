@@ -51,6 +51,10 @@ export default class Printer extends Buffer {
 
     if (opts.before) opts.before();
 
+    // Add the indent before marking so the sourcemap range does not include the
+    // indentation whitespace.
+    this._ensureIndented();
+
     this.map.mark(node);
 
     this._print(node, parent);

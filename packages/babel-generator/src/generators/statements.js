@@ -253,7 +253,7 @@ export function VariableDeclaration(node: Object, parent: Object) {
   if (!this.format.compact && !this.format.concise && hasInits && !this.format.retainLines) {
     sep = () => {
       this.push(",");
-      this.push("\n");
+      this.newline();
       for (var i = 0; i <= node.kind.length; i++){
         this.push(" ");
       }

@@ -108,7 +108,7 @@ export function CallExpression(node: Object) {
   if (isPrettyCall) {
     separator = () => {
       this.push(",");
-      this.push("\n");
+      this.newline();
     };
     this.newline();
     this.indent();

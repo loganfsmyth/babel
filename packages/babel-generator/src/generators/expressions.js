@@ -174,8 +174,7 @@ export function AssignmentExpression(node: Object, parent: Object) {
 
   this.print(node.left, node);
 
-  let spaces = !this.format.compact || node.operator === "in" || node.operator === "instanceof";
-  if (spaces) this.push(" ");
+  this.space();
 
   if (node.operator === "in" || node.operator === "instanceof"){
     this.word(node.operator);
@@ -183,22 +182,7 @@ export function AssignmentExpression(node: Object, parent: Object) {
     this.push(node.operator);
   }
 
-  if (!spaces) {
-    // space is mandatory to avoid outputting <!--
-    // http://javascript.spec.whatwg.org/#comment-syntax
-    spaces = node.operator === "<" &&
-             t.isUnaryExpression(node.right, { prefix: true, operator: "!" }) &&
-             t.isUnaryExpression(node.right.argument, { prefix: true, operator: "--" });
-
-    // Need spaces for operators of the same kind to avoid: `a+++b`
-    if (!spaces) {
-      let right = getLeftMost(node.right);
-      spaces = t.isUnaryExpression(right, { prefix: true, operator: node.operator }) ||
-               t.isUpdateExpression(right, { prefix: true, operator: node.operator + node.operator });
-    }
-  }
-
-  if (spaces) this.push(" ");
+  this.space();
 
   this.print(node.right, node);
 

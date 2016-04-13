@@ -328,6 +328,23 @@ export default class Buffer {
       }
     }
 
+    if (this.last){
+      let last = this.last;
+
+      // Ensure that we don't create invalid operators when pushing new operators.
+      if ((str[0] === "=" && ["+", "-", "*", "\/", "%", "|", "&", "^", ">>", ">>>", "<<", "!"].indexOf(last) !== -1) ||
+        (str[0] === ">" && last === '=') ||
+        (str[0] === "-" && last === "-") ||
+        (str[0] === "+" && last === "+") ||
+        (str[0] === "*" && last === "*") ||
+
+        // space is mandatory to avoid outputting <!--
+        // http://javascript.spec.whatwg.org/#comment-syntax
+        (str[0] === '!' && last === '<')){
+        this._push(" ");
+      }
+    }
+
     // If there the line is ending, adding a new mapping marker is redundant
     if (str[0] !== "\n") this.map.mark(this._sourcePosition);
 

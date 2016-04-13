@@ -57,7 +57,7 @@ export function ForStatement(node: Object) {
   this._inForStatementInitCounter++;
   this.print(node.init, node);
   this._inForStatementInitCounter--;
-  this.push(";");
+  this.semicolon(";");
 
   if (node.test) {
     this.space();
@@ -111,7 +111,7 @@ export function DoWhileStatement(node: Object) {
   this.push("(");
   this.print(node.test, node);
   this.push(")");
-  this.push(";");
+  this.semicolon();
 }
 
 function buildLabelStatement(prefix, key = "label") {
@@ -219,7 +219,7 @@ export function SwitchCase(node: Object) {
 
 export function DebuggerStatement() {
   this.word("debugger");
-  this.push(";");
+  this.semicolon();
 }
 
 export function VariableDeclaration(node: Object, parent: Object) {

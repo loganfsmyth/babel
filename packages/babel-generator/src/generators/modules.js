@@ -3,7 +3,9 @@ import * as t from "babel-types";
 export function ImportSpecifier(node: Object) {
   this.print(node.imported, node);
   if (node.local && node.local.name !== node.imported.name) {
-    this.push(" as ");
+    this.push(" ");
+    this.word("as");
+    this.push(" ");
     this.print(node.local, node);
   }
 }
@@ -19,34 +21,49 @@ export function ExportDefaultSpecifier(node: Object) {
 export function ExportSpecifier(node: Object) {
   this.print(node.local, node);
   if (node.exported && node.local.name !== node.exported.name) {
-    this.push(" as ");
+    this.push(" ");
+    this.word("as");
+    this.push(" ");
     this.print(node.exported, node);
   }
 }
 
 export function ExportNamespaceSpecifier(node: Object) {
-  this.push("* as ");
+  this.push("*");
+  this.push(" ");
+  this.word("as");
+  this.push(" ");
   this.print(node.exported, node);
 }
 
 export function ExportAllDeclaration(node: Object) {
-  this.push("export *");
+  this.word("export");
+  this.push(" ");
+  this.push("*");
   if (node.exported) {
-    this.push(" as ");
+    this.push(" ");
+    this.word("as");
+    this.push(" ");
     this.print(node.exported, node);
   }
-  this.push(" from ");
+  this.push(" ");
+  this.word("from");
+  this.push(" ");
   this.print(node.source, node);
   this.semicolon();
 }
 
 export function ExportNamedDeclaration() {
-  this.push("export ");
+  this.word("export");
+  this.push(" ");
   ExportDeclaration.apply(this, arguments);
 }
 
 export function ExportDefaultDeclaration() {
-  this.push("export default ");
+  this.word("export");
+  this.push(" ");
+  this.word("default");
+  this.push(" ");
   ExportDeclaration.apply(this, arguments);
 }
 
@@ -57,7 +74,8 @@ function ExportDeclaration(node: Object) {
     if (t.isStatement(declar) || t.isFunction(declar) || t.isClass(declar)) return;
   } else {
     if (node.exportKind === "type") {
-      this.push("type ");
+      this.word("type");
+      this.push(" ");
     }
 
     let specifiers = node.specifiers.slice(0);
@@ -70,7 +88,8 @@ function ExportDeclaration(node: Object) {
         hasSpecial = true;
         this.print(specifiers.shift(), node);
         if (specifiers.length) {
-          this.push(", ");
+          this.push(",");
+          this.push(" ");
         }
       } else {
         break;
@@ -81,14 +100,16 @@ function ExportDeclaration(node: Object) {
       this.push("{");
       if (specifiers.length) {
         this.space();
-        this.printJoin(specifiers, node, { separator: ", " });
+        this.printList(specifiers, node);
         this.space();
       }
       this.push("}");
     }
 
     if (node.source) {
-      this.push(" from ");
+      this.push(" ");
+      this.word("from");
+      this.push(" ");
       this.print(node.source, node);
     }
   }
@@ -97,10 +118,12 @@ function ExportDeclaration(node: Object) {
 }
 
 export function ImportDeclaration(node: Object) {
-  this.push("import ");
+  this.word("import");
+  this.push(" ");
 
   if (node.importKind === "type" || node.importKind === "typeof") {
-    this.push(node.importKind + " ");
+    this.word(node.importKind);
+    this.push(" ");
   }
 
   let specifiers = node.specifiers.slice(0);
@@ -111,7 +134,8 @@ export function ImportDeclaration(node: Object) {
       if (t.isImportDefaultSpecifier(first) || t.isImportNamespaceSpecifier(first)) {
         this.print(specifiers.shift(), node);
         if (specifiers.length) {
-          this.push(", ");
+          this.push(",");
+          this.push(" ");
         }
       } else {
         break;
@@ -121,12 +145,14 @@ export function ImportDeclaration(node: Object) {
     if (specifiers.length) {
       this.push("{");
       this.space();
-      this.printJoin(specifiers, node, { separator: ", " });
+      this.printList(specifiers, node);
       this.space();
       this.push("}");
     }
 
-    this.push(" from ");
+    this.push(" ");
+    this.word("from");
+    this.push(" ");
   }
 
   this.print(node.source, node);
@@ -134,6 +160,9 @@ export function ImportDeclaration(node: Object) {
 }
 
 export function ImportNamespaceSpecifier(node: Object) {
-  this.push("* as ");
+  this.push("*");
+  this.push(" ");
+  this.word("as");
+  this.push(" ");
   this.print(node.local, node);
 }

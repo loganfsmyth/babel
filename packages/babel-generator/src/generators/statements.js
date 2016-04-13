@@ -4,7 +4,8 @@ import * as t from "babel-types";
 const NON_ALPHABETIC_UNARY_OPERATORS = t.UPDATE_OPERATORS.concat(t.NUMBER_UNARY_OPERATORS).concat(["!"]);
 
 export function WithStatement(node: Object) {
-  this.keyword("with");
+  this.word("with");
+  this.space();
   this.push("(");
   this.print(node.object, node);
   this.push(")");
@@ -12,7 +13,8 @@ export function WithStatement(node: Object) {
 }
 
 export function IfStatement(node: Object) {
-  this.keyword("if");
+  this.word("if");
+  this.space();
   this.push("(");
   this.print(node.test, node);
   this.push(")");
@@ -35,7 +37,8 @@ export function IfStatement(node: Object) {
 
   if (node.alternate) {
     if (this.isLast("}")) this.space();
-    this.push("else ");
+    this.word("else");
+    this.push(" ");
     this.printAndIndentOnComments(node.alternate, node);
   }
 }
@@ -47,7 +50,8 @@ function getLastStatement(statement) {
 }
 
 export function ForStatement(node: Object) {
-  this.keyword("for");
+  this.word("for");
+  this.space();
   this.push("(");
 
   this._inForStatementInitCounter++;
@@ -71,7 +75,8 @@ export function ForStatement(node: Object) {
 }
 
 export function WhileStatement(node: Object) {
-  this.keyword("while");
+  this.word("while");
+  this.space();
   this.push("(");
   this.print(node.test, node);
   this.push(")");
@@ -80,10 +85,13 @@ export function WhileStatement(node: Object) {
 
 let buildForXStatement = function (op) {
   return function (node: Object) {
-    this.keyword("for");
+    this.word("for");
+    this.space();
     this.push("(");
     this.print(node.left, node);
-    this.push(` ${op} `);
+    this.push(" ");
+    this.word(op);
+    this.push(" ");
     this.print(node.right, node);
     this.push(")");
     this.printBlock(node);
@@ -94,18 +102,21 @@ export let ForInStatement = buildForXStatement("in");
 export let ForOfStatement = buildForXStatement("of");
 
 export function DoWhileStatement(node: Object) {
-  this.push("do ");
+  this.word("do");
+  this.push(" ");
   this.print(node.body, node);
   this.space();
-  this.keyword("while");
+  this.word("while");
+  this.space();
   this.push("(");
   this.print(node.test, node);
-  this.push(");");
+  this.push(")");
+  this.push(";");
 }
 
 function buildLabelStatement(prefix, key = "label") {
   return function (node: Object) {
-    this.push(prefix);
+    this.word(prefix);
 
     let label = node[key];
     if (label) {
@@ -132,12 +143,14 @@ export let ThrowStatement    = buildLabelStatement("throw", "argument");
 
 export function LabeledStatement(node: Object) {
   this.print(node.label, node);
-  this.push(": ");
+  this.push(":");
+  this.push(" ");
   this.print(node.body, node);
 }
 
 export function TryStatement(node: Object) {
-  this.keyword("try");
+  this.word("try");
+  this.space();
   this.print(node.block, node);
   this.space();
 
@@ -152,13 +165,15 @@ export function TryStatement(node: Object) {
 
   if (node.finalizer) {
     this.space();
-    this.push("finally ");
+    this.word("finally");
+    this.push(" ");
     this.print(node.finalizer, node);
   }
 }
 
 export function CatchClause(node: Object) {
-  this.keyword("catch");
+  this.word("catch");
+  this.space();
   this.push("(");
   this.print(node.param, node);
   this.push(")");
@@ -167,7 +182,8 @@ export function CatchClause(node: Object) {
 }
 
 export function SwitchStatement(node: Object) {
-  this.keyword("switch");
+  this.word("switch");
+  this.space();
   this.push("(");
   this.print(node.discriminant, node);
   this.push(")");
@@ -186,11 +202,13 @@ export function SwitchStatement(node: Object) {
 
 export function SwitchCase(node: Object) {
   if (node.test) {
-    this.push("case ");
+    this.word("case");
+    this.push(" ");
     this.print(node.test, node);
     this.push(":");
   } else {
-    this.push("default:");
+    this.word("default");
+    this.push(":");
   }
 
   if (node.consequent.length) {
@@ -200,11 +218,13 @@ export function SwitchCase(node: Object) {
 }
 
 export function DebuggerStatement() {
-  this.push("debugger;");
+  this.word("debugger");
+  this.push(";");
 }
 
 export function VariableDeclaration(node: Object, parent: Object) {
-  this.push(node.kind + " ");
+  this.word(node.kind);
+  this.push(" ");
 
   let hasInits = false;
   // don't add whitespace to loop heads
@@ -231,7 +251,13 @@ export function VariableDeclaration(node: Object, parent: Object) {
 
   let sep;
   if (!this.format.compact && !this.format.concise && hasInits && !this.format.retainLines) {
-    sep = `,\n${repeating(" ", node.kind.length + 1)}`;
+    sep = () => {
+      this.push(",");
+      this.push("\n");
+      for (var i = 0; i <= node.kind.length; i++){
+        this.push(" ");
+      }
+    };
   }
 
   //

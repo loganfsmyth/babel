@@ -21,13 +21,17 @@ export function UnaryExpression(node: Object) {
     needsSpace = false;
   }
 
-  this.push(node.operator);
+  if (node.operator === 'void' || node.operator === 'delete' || node.operator === 'typeof'){
+    this.word(node.operator);
+  } else {
+    this.push(node.operator);
+  }
   if (needsSpace) this.push(" ");
   this.print(node.argument, node);
 }
 
 export function DoExpression(node: Object) {
-  this.push("do");
+  this.word("do");
   this.space();
   this.print(node.body, node);
 }
@@ -61,7 +65,8 @@ export function ConditionalExpression(node: Object) {
 }
 
 export function NewExpression(node: Object, parent: Object) {
-  this.push("new ");
+  this.word("new");
+  this.push(" ");
   this.print(node.callee, node);
   if (node.arguments.length === 0 && this.format.minified &&
       !t.isCallExpression(parent, { callee: node }) &&
@@ -78,11 +83,11 @@ export function SequenceExpression(node: Object) {
 }
 
 export function ThisExpression() {
-  this.push("this");
+  this.word("this");
 }
 
 export function Super() {
-  this.push("super");
+  this.word("super");
 }
 
 export function Decorator(node: Object) {
@@ -101,7 +106,10 @@ export function CallExpression(node: Object) {
 
   let separator;
   if (isPrettyCall) {
-    separator = ",\n";
+    separator = () => {
+      this.push(",");
+      this.push("\n");
+    };
     this.newline();
     this.indent();
   }
@@ -118,7 +126,7 @@ export function CallExpression(node: Object) {
 
 function buildYieldAwait(keyword: string) {
   return function (node: Object) {
-    this.push(keyword);
+    this.word(keyword);
 
     if (node.delegate) {
       this.push("*");
@@ -169,7 +177,11 @@ export function AssignmentExpression(node: Object, parent: Object) {
   let spaces = !this.format.compact || node.operator === "in" || node.operator === "instanceof";
   if (spaces) this.push(" ");
 
-  this.push(node.operator);
+  if (node.operator === "in" || node.operator === "instanceof"){
+    this.word(node.operator);
+  } else {
+    this.push(node.operator);
+  }
 
   if (!spaces) {
     // space is mandatory to avoid outputting <!--

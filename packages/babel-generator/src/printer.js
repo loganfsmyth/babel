@@ -141,7 +141,7 @@ export default class Printer extends Buffer {
         }
 
         if (opts.separator && i < len - 1) {
-          this.push(opts.separator);
+          opts.separator();
         }
       }
     };
@@ -203,8 +203,10 @@ export default class Printer extends Buffer {
 
   printList(items, parent, opts = {}) {
     if (opts.separator == null) {
-      opts.separator = ",";
-      if (!this.format.compact) opts.separator += " ";
+      opts.separator = () => {
+        this.push(",");
+        if (!this.format.compact) this.push(" ");
+      }
     }
 
     return this.printJoin(items, parent, opts);
@@ -279,7 +281,7 @@ export default class Printer extends Buffer {
       let val    = this.generateComment(comment);
 
       if (column && !this.isLast(["\n", " ", "[", "{"])) {
-        this._push(" ");
+        this.push(" ", true /* noIndent */);
         column++;
       }
 
@@ -307,7 +309,7 @@ export default class Printer extends Buffer {
       }
 
       //
-      this._push(val);
+      this.push(val, true /* noIndent */);
 
       // whitespace after
       this.newline(this.whitespace.getNewlinesAfter(comment));

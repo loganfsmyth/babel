@@ -20,6 +20,8 @@ export default class Buffer {
     // see https://github.com/babel/babel/pull/3283 for details.
     this.last = "";
 
+    this._endsWithCharacters = false;
+
     this.map = null;
     this._sourcePosition = {
       line: null,
@@ -44,7 +46,7 @@ export default class Buffer {
     // catch up to this nodes newline if we're behind
     if (node.loc && this.format.retainLines && this.buf) {
       while (this.position.line < node.loc.start.line) {
-        this._push("\n");
+        this.push("\n", true /* noIndent */);
       }
     }
   }
@@ -122,12 +124,27 @@ export default class Buffer {
   }
 
   /**
-   * Add a keyword to the buffer.
+   * Add a word to the buffer.
    */
 
-  keyword(name: string) {
+  word(name){
+    if (this._endsWithCharacters) this.push(" ");
+
     this.push(name);
-    this.space();
+    this._endsWithCharacters = true;
+  }
+
+  number(value){
+    if (this._endsWithCharacters) this.push(" ");
+
+    this.push(value);
+    this._endsWithCharacters = true;
+  }
+
+  regex(str, hasFlags){
+    this.push(str);
+
+    this._endsWithCharacters = hasFlags;
   }
 
   /**
@@ -222,7 +239,9 @@ export default class Buffer {
 
     this.removeLast(" ");
     this._removeSpacesAfterLastNewline();
-    this._push(repeating("\n", i));
+    for (let j = 0; j < i; j++){
+      this.push("\n", true /* noIndent */);
+    }
   }
 
   /**
@@ -324,6 +343,8 @@ export default class Buffer {
     this.position.push(str);
     this.buf += str;
     this.last = str[str.length - 1];
+
+    this._endsWithCharacters = false;
   }
 
   /**

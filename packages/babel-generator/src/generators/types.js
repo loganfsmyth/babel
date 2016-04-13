@@ -14,7 +14,7 @@ export function Identifier(node: Object) {
     this.push("-");
   }
 
-  this.push(node.name);
+  this.word(node.name);
 }
 
 export function RestElement(node: Object) {
@@ -46,12 +46,12 @@ export function ObjectExpression(node: Object) {
 export { ObjectExpression as ObjectPattern };
 
 export function ObjectMethod(node: Object) {
-  this.printJoin(node.decorators, node, { separator: "" });
+  this.printJoin(node.decorators, node);
   this._method(node);
 }
 
 export function ObjectProperty(node: Object) {
-  this.printJoin(node.decorators, node, { separator: "" });
+  this.printJoin(node.decorators, node);
 
   if (node.computed) {
     this.push("[");
@@ -109,19 +109,19 @@ export function ArrayExpression(node: Object) {
 export { ArrayExpression as ArrayPattern };
 
 export function RegExpLiteral(node: Object) {
-  this.push(`/${node.pattern}/${node.flags}`);
+  this.regex(`/${node.pattern}/${node.flags}`, !!node.flags);
 }
 
 export function BooleanLiteral(node: Object) {
-  this.push(node.value ? "true" : "false");
+  this.word(node.value ? "true" : "false");
 }
 
 export function NullLiteral() {
-  this.push("null");
+  this.word("null");
 }
 
 export function NumericLiteral(node: Object) {
-  this.push(node.value + "");
+  this.number(node.value + "");
 }
 
 export function StringLiteral(node: Object, parent: Object) {

@@ -7,7 +7,7 @@ export function JSXAttribute(node: Object) {
 }
 
 export function JSXIdentifier(node: Object) {
-  this.push(node.name);
+  this.word(node.name);
 }
 
 export function JSXNamespacedName(node: Object) {
@@ -23,7 +23,8 @@ export function JSXMemberExpression(node: Object) {
 }
 
 export function JSXSpreadAttribute(node: Object) {
-  this.push("{...");
+  this.push("{");
+  this.push("...");
   this.print(node.argument, node);
   this.push("}");
 }
@@ -57,7 +58,11 @@ export function JSXOpeningElement(node: Object) {
   this.print(node.name, node);
   if (node.attributes.length > 0) {
     this.push(" ");
-    this.printJoin(node.attributes, node, { separator: " " });
+    this.printJoin(node.attributes, node, {
+      separator: () => {
+        this.push(" ");
+      }
+    });
   }
   this.push(node.selfClosing ? " />" : ">");
 }

@@ -165,7 +165,7 @@ export default class Buffer {
   }
 
   _removeLast(cha: string) {
-    if (!this._isLast(cha)) return;
+    if (!this.endsWith(cha)) return;
     this.uncommittedText = this.uncommittedText.slice(0, -cha.length);
     this.position.unshift(cha);
   }
@@ -300,7 +300,7 @@ export default class Buffer {
       str = str.replace(/\n/g, `\n${indent}`);
 
       // we've got a newline before us so prepend on the indentation
-      if (this.isLast("\n")) this._push(indent);
+      if (this.endsWith("\n")) this._push(indent);
     }
 
     this._push(str);
@@ -380,6 +380,8 @@ export default class Buffer {
    */
 
   endsWith(str: string): boolean {
+    if (Array.isArray(str)) return str.some(s => this.endsWith(s));
+
     let end = this.last + this.uncommittedText;
 
     // Note, this is not true in the general case, but it is true for the cases
@@ -387,24 +389,5 @@ export default class Buffer {
     if (str.length > end.length) return false;
 
     return end.slice(-str.length) === str;
-  }
-
-  /**
-   * Test if a character is last in the buffer.
-   */
-
-  isLast(cha: string): boolean {
-    if (this.format.compact) return false;
-    return this._isLast(cha);
-  }
-
-  _isLast(cha: string): boolean {
-    let last = (this.last + this.uncommittedText).slice(-1);
-
-    if (Array.isArray(cha)) {
-      return cha.indexOf(last) >= 0;
-    } else {
-      return cha === last;
-    }
   }
 }

@@ -38,7 +38,7 @@ export function IfStatement(node: Object) {
   if (node.alternate) {
     if (this.isLast("}")) this.space();
     this.word("else");
-    this.push(" ");
+    this.space();
     this.printAndIndentOnComments(node.alternate, node);
   }
 }
@@ -89,9 +89,9 @@ let buildForXStatement = function (op) {
     this.space();
     this.push("(");
     this.print(node.left, node);
-    this.push(" ");
+    this.space();
     this.word(op);
-    this.push(" ");
+    this.space();
     this.print(node.right, node);
     this.push(")");
     this.printBlock(node);
@@ -103,7 +103,7 @@ export let ForOfStatement = buildForXStatement("of");
 
 export function DoWhileStatement(node: Object) {
   this.word("do");
-  this.push(" ");
+  this.space();
   this.print(node.body, node);
   this.space();
   this.word("while");
@@ -123,7 +123,7 @@ function buildLabelStatement(prefix, key = "label") {
       if (!(this.format.minified && ((t.isUnaryExpression(label, { prefix: true }) ||
                                       t.isUpdateExpression(label, { prefix: true })) &&
                                      NON_ALPHABETIC_UNARY_OPERATORS.indexOf(label.operator) > -1))) {
-        this.push(" ");
+        this.space();
 
       }
 
@@ -144,7 +144,7 @@ export let ThrowStatement    = buildLabelStatement("throw", "argument");
 export function LabeledStatement(node: Object) {
   this.print(node.label, node);
   this.push(":");
-  this.push(" ");
+  this.space();
   this.print(node.body, node);
 }
 
@@ -166,7 +166,7 @@ export function TryStatement(node: Object) {
   if (node.finalizer) {
     this.space();
     this.word("finally");
-    this.push(" ");
+    this.space();
     this.print(node.finalizer, node);
   }
 }
@@ -203,7 +203,7 @@ export function SwitchStatement(node: Object) {
 export function SwitchCase(node: Object) {
   if (node.test) {
     this.word("case");
-    this.push(" ");
+    this.space();
     this.print(node.test, node);
     this.push(":");
   } else {
@@ -224,7 +224,7 @@ export function DebuggerStatement() {
 
 export function VariableDeclaration(node: Object, parent: Object) {
   this.word(node.kind);
-  this.push(" ");
+  this.space();
 
   let hasInits = false;
   // don't add whitespace to loop heads

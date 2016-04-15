@@ -205,7 +205,7 @@ export default class Printer extends Buffer {
     if (opts.separator == null) {
       opts.separator = () => {
         this.push(",");
-        if (!this.format.compact) this.push(" ");
+        this.space();
       }
     }
 

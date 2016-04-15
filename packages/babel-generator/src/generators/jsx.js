@@ -57,10 +57,10 @@ export function JSXOpeningElement(node: Object) {
   this.push("<");
   this.print(node.name, node);
   if (node.attributes.length > 0) {
-    this.push(" ");
+    this.space();
     this.printJoin(node.attributes, node, {
       separator: () => {
-        this.push(" ");
+        this.space();
       }
     });
   }

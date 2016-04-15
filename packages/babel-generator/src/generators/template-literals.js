@@ -17,9 +17,9 @@ export function TemplateLiteral(node: Object) {
 
     if (i + 1 < quasis.length) {
       this.push("${", true /* noIndent */);
-      this.push(" ");
+      this.space();
       this.print(node.expressions[i], node);
-      this.push(" ")
+      this.space();
       this.push("}");
     }
   }

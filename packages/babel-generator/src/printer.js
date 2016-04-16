@@ -40,28 +40,25 @@ export default class Printer extends Buffer {
     if (node.loc) this.printAuxAfterComment();
     this.printAuxBeforeComment(oldInAux);
 
-    let needsParens = n.needsParens(node, parent, this._printStack);
-    if (needsParens) this.push("(");
+    this._maybeWrapParens(node, parent, () => {
+      this.printLeadingComments(node, parent);
 
-    this.printLeadingComments(node, parent);
+      this.catchUp(node);
 
-    this.catchUp(node);
+      this._printNewline(true, node, parent, opts);
 
-    this._printNewline(true, node, parent, opts);
+      if (opts.before) opts.before();
 
-    if (opts.before) opts.before();
+      let loc = (t.isProgram(node) || t.isFile(node)) ? null : node.loc;
+      this.withSource("start", loc, () => {
+        this._print(node, parent);
+      });
 
-    let loc = (t.isProgram(node) || t.isFile(node)) ? null : node.loc;
-    this.withSource("start", loc, () => {
-      this._print(node, parent);
+      // Check again if any of our children may have left an aux comment on the stack
+      if (node.loc) this.printAuxAfterComment();
+
+      this.printTrailingComments(node, parent);
     });
-
-    // Check again if any of our children may have left an aux comment on the stack
-    if (node.loc) this.printAuxAfterComment();
-
-    this.printTrailingComments(node, parent);
-
-    if (needsParens) this.push(")");
 
     // end
     this._printStack.pop();
@@ -71,6 +68,15 @@ export default class Printer extends Buffer {
     this.insideAux = oldInAux;
 
     this._printNewline(false, node, parent, opts);
+  }
+
+  _maybeWrapParens(node, parent, cb){
+    let needsParens = n.needsParens(node, parent, this._printStack);
+    if (needsParens) this.push("(");
+
+    cb();
+
+    if (needsParens) this.push(")");
   }
 
   inSquareBrackets(cb){

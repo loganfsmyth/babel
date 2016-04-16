@@ -6,33 +6,33 @@ const NON_ALPHABETIC_UNARY_OPERATORS = t.UPDATE_OPERATORS.concat(t.NUMBER_UNARY_
 export function WithStatement(node: Object) {
   this.word("with");
   this.space();
-  this.push("(");
-  this.print(node.object, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.object, node);
+  });
   this.printBlock(node);
 }
 
 export function IfStatement(node: Object) {
   this.word("if");
   this.space();
-  this.push("(");
-  this.print(node.test, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.test, node);
+  });
   this.space();
 
   let needsBlock = node.alternate && t.isIfStatement(getLastStatement(node.consequent));
   if (needsBlock) {
-    this.push("{");
-    this.newline();
-    this.indent();
-  }
+    this.inCurlyBrackets(() => {
+      this.newline();
+      this.indent();
 
-  this.printAndIndentOnComments(node.consequent, node);
+      this.printAndIndentOnComments(node.consequent, node);
 
-  if (needsBlock) {
-    this.dedent();
-    this.newline();
-    this.push("}");
+      this.dedent();
+      this.newline();
+    });
+  } else {
+    this.printAndIndentOnComments(node.consequent, node);
   }
 
   if (node.alternate) {
@@ -52,34 +52,34 @@ function getLastStatement(statement) {
 export function ForStatement(node: Object) {
   this.word("for");
   this.space();
-  this.push("(");
+  this.inParens(() => {
 
-  this._inForStatementInitCounter++;
-  this.print(node.init, node);
-  this._inForStatementInitCounter--;
-  this.semicolon(";");
+    this._inForStatementInitCounter++;
+    this.print(node.init, node);
+    this._inForStatementInitCounter--;
+    this.semicolon(";");
 
-  if (node.test) {
-    this.space();
-    this.print(node.test, node);
-  }
-  this.push(";");
+    if (node.test) {
+      this.space();
+      this.print(node.test, node);
+    }
+    this.push(";");
 
-  if (node.update) {
-    this.space();
-    this.print(node.update, node);
-  }
+    if (node.update) {
+      this.space();
+      this.print(node.update, node);
+    }
 
-  this.push(")");
+  });
   this.printBlock(node);
 }
 
 export function WhileStatement(node: Object) {
   this.word("while");
   this.space();
-  this.push("(");
-  this.print(node.test, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.test, node);
+  });
   this.printBlock(node);
 }
 
@@ -87,13 +87,13 @@ let buildForXStatement = function (op) {
   return function (node: Object) {
     this.word("for");
     this.space();
-    this.push("(");
-    this.print(node.left, node);
-    this.space();
-    this.word(op);
-    this.space();
-    this.print(node.right, node);
-    this.push(")");
+    this.inParens(() => {
+      this.print(node.left, node);
+      this.space();
+      this.word(op);
+      this.space();
+      this.print(node.right, node);
+    });
     this.printBlock(node);
   };
 };
@@ -108,9 +108,9 @@ export function DoWhileStatement(node: Object) {
   this.space();
   this.word("while");
   this.space();
-  this.push("(");
-  this.print(node.test, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.test, node);
+  });
   this.semicolon();
 }
 
@@ -169,9 +169,9 @@ export function TryStatement(node: Object) {
 export function CatchClause(node: Object) {
   this.word("catch");
   this.space();
-  this.push("(");
-  this.print(node.param, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.param, node);
+  });
   this.space();
   this.print(node.body, node);
 }
@@ -179,20 +179,19 @@ export function CatchClause(node: Object) {
 export function SwitchStatement(node: Object) {
   this.word("switch");
   this.space();
-  this.push("(");
-  this.print(node.discriminant, node);
-  this.push(")");
-  this.space();
-  this.push("{");
-
-  this.printSequence(node.cases, node, {
-    indent: true,
-    addNewlines(leading, cas) {
-      if (!leading && node.cases[node.cases.length - 1] === cas) return -1;
-    }
+  this.inParens(() => {
+    this.print(node.discriminant, node);
   });
+  this.space();
 
-  this.push("}");
+  this.inCurlyBrackets(() => {
+    this.printSequence(node.cases, node, {
+      indent: true,
+      addNewlines(leading, cas) {
+        if (!leading && node.cases[node.cases.length - 1] === cas) return -1;
+      }
+    });
+  });
 }
 
 export function SwitchCase(node: Object) {

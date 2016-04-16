@@ -73,6 +73,24 @@ export default class Printer extends Buffer {
     this._printNewline(false, node, parent, opts);
   }
 
+  inSquareBrackets(cb){
+    this.push("[");
+    cb();
+    this.push("]");
+  }
+
+  inCurlyBrackets(cb){
+    this.push("{");
+    cb();
+    this.rightBrace();
+  }
+
+  inParens(cb){
+    this.push("(");
+    cb();
+    this.push(")");
+  }
+
   printAuxBeforeComment(wasInAux) {
     let comment = this.format.auxiliaryCommentBefore;
     if (!wasInAux && this.insideAux && !this.printAuxAfterOnNextUserNode) {

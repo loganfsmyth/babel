@@ -97,13 +97,13 @@ function ExportDeclaration(node: Object) {
     }
 
     if (specifiers.length || (!specifiers.length && !hasSpecial)) {
-      this.push("{");
-      if (specifiers.length) {
-        this.space();
-        this.printList(specifiers, node);
-        this.space();
-      }
-      this.push("}");
+      this.inCurlyBrackets(() => {
+        if (specifiers.length) {
+          this.space();
+          this.printList(specifiers, node);
+          this.space();
+        }
+      });
     }
 
     if (node.source) {
@@ -143,11 +143,11 @@ export function ImportDeclaration(node: Object) {
     }
 
     if (specifiers.length) {
-      this.push("{");
-      this.space();
-      this.printList(specifiers, node);
-      this.space();
-      this.push("}");
+      this.inCurlyBrackets(() => {
+        this.space();
+        this.printList(specifiers, node);
+        this.space();
+      });
     }
 
     this.space();

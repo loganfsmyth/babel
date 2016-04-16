@@ -37,9 +37,9 @@ export function DoExpression(node: Object) {
 }
 
 export function ParenthesizedExpression(node: Object) {
-  this.push("(");
-  this.print(node.expression, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.expression, node);
+  });
 }
 
 export function UpdateExpression(node: Object) {
@@ -73,9 +73,9 @@ export function NewExpression(node: Object, parent: Object) {
       !t.isMemberExpression(parent) &&
       !t.isNewExpression(parent)) return;
 
-  this.push("(");
-  this.printList(node.arguments, node);
-  this.push(")");
+  this.inParens(() => {
+    this.printList(node.arguments, node);
+  });
 }
 
 export function SequenceExpression(node: Object) {
@@ -100,28 +100,26 @@ export function CallExpression(node: Object) {
   this.print(node.callee, node);
   if (node.loc) this.printAuxAfterComment();
 
-  this.push("(");
+  this.inParens(() => {
+    let isPrettyCall = node._prettyCall && !this.format.retainLines && !this.format.compact;
 
-  let isPrettyCall = node._prettyCall && !this.format.retainLines && !this.format.compact;
-
-  let separator;
-  if (isPrettyCall) {
-    separator = () => {
-      this.push(",");
+    let separator;
+    if (isPrettyCall) {
+      separator = () => {
+        this.push(",");
+        this.newline();
+      };
       this.newline();
-    };
-    this.newline();
-    this.indent();
-  }
+      this.indent();
+    }
 
-  this.printList(node.arguments, node, { separator });
+    this.printList(node.arguments, node, { separator });
 
-  if (isPrettyCall) {
-    this.newline();
-    this.dedent();
-  }
-
-  this.push(")");
+    if (isPrettyCall) {
+      this.newline();
+      this.dedent();
+    }
+  });
 }
 
 function buildYieldAwait(keyword: string) {
@@ -216,9 +214,9 @@ export function MemberExpression(node: Object) {
   }
 
   if (computed) {
-    this.push("[");
-    this.print(node.property, node);
-    this.push("]");
+    this.inSquareBrackets(() => {
+      this.print(node.property, node);
+    });
   } else {
     if (t.isNumericLiteral(node.object)) {
       let val = this.getPossibleRaw(node.object) || node.object.value;

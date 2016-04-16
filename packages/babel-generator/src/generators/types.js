@@ -31,16 +31,15 @@ export {
 export function ObjectExpression(node: Object) {
   let props = node.properties;
 
-  this.push("{");
-  this.printInnerComments(node);
+  this.inCurlyBrackets(() => {
+    this.printInnerComments(node);
 
-  if (props.length) {
-    this.space();
-    this.printList(props, node, { indent: true });
-    this.space();
-  }
-
-  this.push("}");
+    if (props.length) {
+      this.space();
+      this.printList(props, node, { indent: true });
+      this.space();
+    }
+  });
 }
 
 export { ObjectExpression as ObjectPattern };
@@ -54,9 +53,9 @@ export function ObjectProperty(node: Object) {
   this.printJoin(node.decorators, node);
 
   if (node.computed) {
-    this.push("[");
-    this.print(node.key, node);
-    this.push("]");
+    this.inSquareBrackets(() => {
+      this.print(node.key, node);
+    });
   } else {
     // print `({ foo: foo = 5 } = {})` as `({ foo = 5 } = {});`
     if (t.isAssignmentPattern(node.value) && t.isIdentifier(node.key) && node.key.name === node.value.left.name) {
@@ -84,26 +83,26 @@ export function ArrayExpression(node: Object) {
   let elems = node.elements;
   let len   = elems.length;
 
-  this.push("[");
-  this.printInnerComments(node);
 
-  for (let i = 0; i < elems.length; i++) {
-    let elem = elems[i];
-    if (elem) {
-      if (i > 0) this.space();
-      this.print(elem, node);
-      if (i < len - 1) this.push(",");
-    } else {
-      // If the array expression ends with a hole, that hole
-      // will be ignored by the interpreter, but if it ends with
-      // two (or more) holes, we need to write out two (or more)
-      // commas so that the resulting code is interpreted with
-      // both (all) of the holes.
-      this.push(",");
+  this.inSquareBrackets(() => {
+    this.printInnerComments(node);
+
+    for (let i = 0; i < elems.length; i++) {
+      let elem = elems[i];
+      if (elem) {
+        if (i > 0) this.space();
+        this.print(elem, node);
+        if (i < len - 1) this.push(",");
+      } else {
+        // If the array expression ends with a hole, that hole
+        // will be ignored by the interpreter, but if it ends with
+        // two (or more) holes, we need to write out two (or more)
+        // commas so that the resulting code is interpreted with
+        // both (all) of the holes.
+        this.push(",");
+      }
     }
-  }
-
-  this.push("]");
+  });
 }
 
 export { ArrayExpression as ArrayPattern };

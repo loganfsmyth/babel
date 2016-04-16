@@ -31,19 +31,18 @@ export function ClassDeclaration(node: Object) {
 export { ClassDeclaration as ClassExpression };
 
 export function ClassBody(node: Object) {
-  this.push("{");
-  this.printInnerComments(node);
-  if (node.body.length === 0) {
-    this.push("}");
-  } else {
-    this.newline();
+  this.inCurlyBrackets(() => {
+    this.printInnerComments(node);
+    if (node.body.length !== 0) {
+      this.newline();
 
-    this.indent();
-    this.printSequence(node.body, node);
-    this.dedent();
+      this.indent();
+      this.printSequence(node.body, node);
+      this.dedent();
 
-    this.rightBrace();
-  }
+      this.newline(true);
+    }
+  });
 }
 
 export function ClassProperty(node: Object) {

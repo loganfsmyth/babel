@@ -2,14 +2,14 @@ import * as t from "babel-types";
 
 export function _params(node: Object) {
   this.print(node.typeParameters, node);
-  this.push("(");
-  this.printList(node.params, node, {
-    iterator: (node) => {
-      if (node.optional) this.push("?");
-      this.print(node.typeAnnotation, node);
-    }
+  this.inParens(() => {
+    this.printList(node.params, node, {
+      iterator: (node) => {
+        if (node.optional) this.push("?");
+        this.print(node.typeAnnotation, node);
+      }
+    });
   });
-  this.push(")");
 
   if (node.returnType) {
     this.print(node.returnType, node);
@@ -37,9 +37,9 @@ export function _method(node: Object) {
   }
 
   if (node.computed) {
-    this.push("[");
-    this.print(key, node);
-    this.push("]");
+    this.inSquareBrackets(() => {
+      this.print(key, node);
+    });
   } else {
     this.print(key, node);
   }

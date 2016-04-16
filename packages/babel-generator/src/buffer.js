@@ -112,7 +112,6 @@ export default class Buffer {
    */
 
   rightBrace() {
-    this.newline(true);
     if (this.format.minified && !this._lastPrintedIsEmptyStatement) {
       this._removeLast(";");
     }

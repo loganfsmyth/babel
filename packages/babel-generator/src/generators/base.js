@@ -12,23 +12,22 @@ export function Program(node: Object) {
 }
 
 export function BlockStatement(node: Object) {
-  this.push("{");
-  this.printInnerComments(node);
-  if (node.body.length) {
-    this.newline();
+  this.inCurlyBrackets(() => {
+    this.printInnerComments(node);
+    if (node.body.length) {
+      this.newline();
 
-    this.printSequence(node.directives, node, { indent: true });
-    if (node.directives && node.directives.length) this.newline();
+      this.printSequence(node.directives, node, { indent: true });
+      if (node.directives && node.directives.length) this.newline();
 
-    this.printSequence(node.body, node, { indent: true });
-    if (!this.format.retainLines && !this.format.concise) this.removeLast("\n");
+      this.printSequence(node.body, node, { indent: true });
+      if (!this.format.retainLines && !this.format.concise) this.removeLast("\n");
+
+      this.newline(true);
+    }
 
     this.source("end", node.loc);
-    this.rightBrace();
-  } else {
-    this.source("end", node.loc);
-    this.push("}");
-  }
+  });
 }
 
 export function Noop() {}

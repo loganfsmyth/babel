@@ -23,16 +23,16 @@ export function JSXMemberExpression(node: Object) {
 }
 
 export function JSXSpreadAttribute(node: Object) {
-  this.push("{");
-  this.push("...");
-  this.print(node.argument, node);
-  this.push("}");
+  this.inCurlyBrackets(() => {
+    this.push("...");
+    this.print(node.argument, node);
+  });
 }
 
 export function JSXExpressionContainer(node: Object) {
-  this.push("{");
-  this.print(node.expression, node);
-  this.push("}");
+  this.inCurlyBrackets(() => {
+    this.print(node.expression, node);
+  });
 }
 
 export function JSXText(node: Object) {

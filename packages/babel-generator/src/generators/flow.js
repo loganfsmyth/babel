@@ -8,8 +8,7 @@ export function AnyTypeAnnotation() {
 
 export function ArrayTypeAnnotation(node: Object) {
   this.print(node.elementType, node);
-  this.push("[");
-  this.push("]");
+  this.inSquareBrackets(() => {});
 }
 
 export function BooleanTypeAnnotation() {
@@ -80,19 +79,18 @@ export function ExistentialTypeParam() {
 
 export function FunctionTypeAnnotation(node: Object, parent: Object) {
   this.print(node.typeParameters, node);
-  this.push("(");
-  this.printList(node.params, node);
+  this.inParens(() => {
+    this.printList(node.params, node);
 
-  if (node.rest) {
-    if (node.params.length) {
-      this.push(",");
-      this.space();
+    if (node.rest) {
+      if (node.params.length) {
+        this.push(",");
+        this.space();
+      }
+      this.push("...");
+      this.print(node.rest, node);
     }
-    this.push("...");
-    this.print(node.rest, node);
-  }
-
-  this.push(")");
+  });
 
   // this node type is overloaded, not sure why but it makes it EXTREMELY annoying
   if (parent.type === "ObjectTypeProperty" || parent.type === "ObjectTypeCallProperty" || parent.type === "DeclareFunction") {
@@ -184,9 +182,9 @@ export function ThisTypeAnnotation() {
 }
 
 export function TupleTypeAnnotation(node: Object) {
-  this.push("[");
-  this.printList(node.types, node);
-  this.push("]");
+  this.inSquareBrackets(() => {
+    this.printList(node.types, node);
+  });
 }
 
 export function TypeofTypeAnnotation(node: Object) {
@@ -227,26 +225,25 @@ export function TypeParameterInstantiation(node: Object) {
 export { TypeParameterInstantiation as TypeParameterDeclaration };
 
 export function ObjectTypeAnnotation(node: Object) {
-  this.push("{");
-  let props = node.properties.concat(node.callProperties, node.indexers);
+  this.inCurlyBrackets(() => {
+    let props = node.properties.concat(node.callProperties, node.indexers);
 
-  if (props.length) {
-    this.space();
+    if (props.length) {
+      this.space();
 
-    this.printJoin(props, node, {
-      indent: true,
-      iterator: () => {
-        if (props.length !== 1) {
-          this.semicolon();
-          this.space();
+      this.printJoin(props, node, {
+        indent: true,
+        iterator: () => {
+          if (props.length !== 1) {
+            this.semicolon();
+            this.space();
+          }
         }
-      }
-    });
+      });
 
-    this.space();
-  }
-
-  this.push("}");
+      this.space();
+    }
+  });
 }
 
 export function ObjectTypeCallProperty(node: Object) {
@@ -262,12 +259,12 @@ export function ObjectTypeIndexer(node: Object) {
     this.word("static");
     this.space();
   }
-  this.push("[");
-  this.print(node.id, node);
-  this.push(":");
-  this.space();
-  this.print(node.key, node);
-  this.push("]");
+  this.inSquareBrackets(() => {
+    this.print(node.id, node);
+    this.push(":");
+    this.space();
+    this.print(node.key, node);
+  });
   this.push(":");
   this.space();
   this.print(node.value, node);
@@ -304,10 +301,10 @@ export function UnionTypeAnnotation(node: Object) {
 }
 
 export function TypeCastExpression(node: Object) {
-  this.push("(");
-  this.print(node.expression, node);
-  this.print(node.typeAnnotation, node);
-  this.push(")");
+  this.inParens(() => {
+    this.print(node.expression, node);
+    this.print(node.typeAnnotation, node);
+  });
 }
 
 export function VoidTypeAnnotation() {

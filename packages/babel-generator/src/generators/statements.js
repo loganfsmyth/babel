@@ -120,12 +120,7 @@ function buildLabelStatement(prefix, key = "label") {
 
     let label = node[key];
     if (label) {
-      if (!(this.format.minified && ((t.isUnaryExpression(label, { prefix: true }) ||
-                                      t.isUpdateExpression(label, { prefix: true })) &&
-                                     NON_ALPHABETIC_UNARY_OPERATORS.indexOf(label.operator) > -1))) {
-        this.space();
-
-      }
+      this.space();
 
       let terminatorState = this.startTerminatorless();
       this.print(label, node);

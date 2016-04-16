@@ -186,17 +186,13 @@ export default class Buffer {
    *  `undefined` will be returned and not `foo` due to the terminator.
    */
 
-  startTerminatorless(): Object {
-    return this.parenPushNewlineState = {
+  terminatorless(cb){
+    let state = this.parenPushNewlineState = {
       printed: false
     };
-  }
 
-  /**
-   * Print an ending parentheses if a starting one has been printed.
-   */
+    cb();
 
-  endTerminatorless(state: Object) {
     if (state.printed) {
       this.dedent();
       this.newline();

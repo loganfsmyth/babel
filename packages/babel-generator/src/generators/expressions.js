@@ -134,9 +134,10 @@ function buildYieldAwait(keyword: string) {
 
     if (node.argument) {
       this.space();
-      let terminatorState = this.startTerminatorless();
-      this.print(node.argument, node);
-      this.endTerminatorless(terminatorState);
+
+      this.terminatorless(() => {
+        this.print(node.argument, node);
+      });
     }
   };
 }

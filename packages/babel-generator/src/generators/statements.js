@@ -122,9 +122,9 @@ function buildLabelStatement(prefix, key = "label") {
     if (label) {
       this.space();
 
-      let terminatorState = this.startTerminatorless();
-      this.print(label, node);
-      this.endTerminatorless(terminatorState);
+      this.terminatorless(() => {
+        this.print(label, node);
+      });
     }
 
     this.semicolon();

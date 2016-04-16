@@ -236,7 +236,7 @@ export default class Printer extends Buffer {
       if (needs(node, parent)) lines++;
 
       // generated nodes can't add starting file whitespace
-      if (!this.buf) lines = 0;
+      if (!this.last && !this.uncommittedText) lines = 0;
     }
 
     this.newline(lines);

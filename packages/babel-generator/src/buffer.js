@@ -16,9 +16,13 @@ export default class Buffer {
     this.buf = "";
 
     // Maintaining a reference to the last char in the buffer is an optimization
-    // to make sure that v8 doesn't "flatten" the string more often than needed
+    // to make sure that v8 doesn't "flatten" the string more often than needed.
+    // We also maintain an 'uncommittedText' list of characters that we allow the
+    // printer to roll back to not be included to avoid adding and removing items
+    // from "buf".
     // see https://github.com/babel/babel/pull/3283 for details.
     this.last = "";
+    this.uncommittedText = "";
 
     this._endsWithCharacters = false;
 
@@ -44,7 +48,7 @@ export default class Buffer {
 
   catchUp(node: Object) {
     // catch up to this nodes newline if we're behind
-    if (node.loc && this.format.retainLines && this.buf) {
+    if (node.loc && this.format.retainLines && (this.last || this.uncommittedText)) {
       while (this.position.line < node.loc.start.line) {
         this.push("\n", true /* noIndent */);
       }
@@ -56,7 +60,7 @@ export default class Buffer {
    */
 
   get(): string {
-    return trimRight(this.buf);
+    return trimRight(this.buf + this.uncommittedText);
   }
 
   /**
@@ -146,7 +150,7 @@ export default class Buffer {
   space() {
     if (this.format.compact) return;
 
-    if (this.buf && !this.isLast(" ") && !this.isLast("\n")) {
+    if ((this.last || this.uncommittedText) && !this.endsWith(" ") && !this.endsWith("\n")) {
       this.push(" ");
     }
   }
@@ -162,8 +166,7 @@ export default class Buffer {
 
   _removeLast(cha: string) {
     if (!this._isLast(cha)) return;
-    this.buf = this.buf.slice(0, -1);
-    this.last = this.buf[this.buf.length - 1];
+    this.uncommittedText = this.uncommittedText.slice(0, -cha.length);
     this.position.unshift(cha);
   }
 
@@ -229,7 +232,6 @@ export default class Buffer {
       this.removeLast("\n");
     }
 
-    this.removeLast(" ");
     this._removeSpacesAfterLastNewline();
     for (let j = 0; j < i; j++){
       this.push("\n", true /* noIndent */);
@@ -241,12 +243,13 @@ export default class Buffer {
    */
 
   _removeSpacesAfterLastNewline() {
-    let lastNewlineIndex = this.buf.lastIndexOf("\n");
-    if (lastNewlineIndex >= 0 && this.get().length <= lastNewlineIndex) {
-      let toRemove = this.buf.slice(lastNewlineIndex + 1);
-      this.buf = this.buf.substring(0, lastNewlineIndex + 1);
-      this.last = "\n";
-      this.position.unshift(toRemove);
+    let lastNewlineIndex = this.uncommittedText.lastIndexOf("\n");
+    if (lastNewlineIndex >= 0 && trimRight(this.uncommittedText).length <= lastNewlineIndex) {
+      this.position.unshift(this.uncommittedText.slice(lastNewlineIndex + 1));
+      this.uncommittedText = this.uncommittedText.substring(0, lastNewlineIndex + 1);
+    } else if (lastNewlineIndex === -1 && trimRight(this.uncommittedText) === ''){
+      this.position.unshift(this.uncommittedText);
+      this.uncommittedText = '';
     }
   }
 
@@ -330,9 +333,8 @@ export default class Buffer {
       }
     }
 
-    if (this.last){
-      let last = this.last;
-
+    let last = (this.last + this.uncommittedText).slice(-1);
+    if (last){
       // Ensure that we don't create invalid operators when pushing new operators.
       if ((str[0] === "=" && ["+", "-", "*", "\/", "%", "|", "&", "^", ">>", ">>>", "<<", "!"].indexOf(last) !== -1) ||
         (str[0] === ">" && last === '=') ||
@@ -352,8 +354,23 @@ export default class Buffer {
 
     //
     this.position.push(str);
-    this.buf += str;
-    this.last = str[str.length - 1];
+
+    let index;
+    for (index = str.length - 1; index >= 0; index--){
+      let chr = str[index];
+      if (chr !== ' ' && chr !== '\n' && chr !== ';'){
+        break;
+      }
+    }
+
+    if (index === -1){
+      this.uncommittedText += str;
+    } else {
+      this.buf += this.uncommittedText + str.slice(0, index + 1);
+
+      this.last = str[index];
+      this.uncommittedText = str.slice(index + 1);
+    }
 
     this._endsWithCharacters = false;
   }
@@ -363,11 +380,13 @@ export default class Buffer {
    */
 
   endsWith(str: string): boolean {
-    if (str.length === 1) {
-      return this.last === str;
-    } else {
-      return this.buf.slice(-str.length) === str;
-    }
+    let end = this.last + this.uncommittedText;
+
+    // Note, this is not true in the general case, but it is true for the cases
+    // that we are using this function for.
+    if (str.length > end.length) return false;
+
+    return end.slice(-str.length) === str;
   }
 
   /**
@@ -380,7 +399,7 @@ export default class Buffer {
   }
 
   _isLast(cha: string): boolean {
-    let last = this.last;
+    let last = (this.last + this.uncommittedText).slice(-1);
 
     if (Array.isArray(cha)) {
       return cha.indexOf(last) >= 0;

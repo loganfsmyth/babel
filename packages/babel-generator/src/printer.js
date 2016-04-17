@@ -123,16 +123,20 @@ export default class Printer extends Buffer {
         this._printMetadata.inStatementBody = true;
       }
 
-
       let needsParens = false;
       if (this._printMetadata.inStatementBody && (t.isFunctionExpression(node) || t.isClassExpression(node) || t.isObjectExpression(node))){
         needsParens = true;
       }
 
-      if (!needsParens && t.isExpression(node)){
-        let prec = null;
+      if (!needsParens){
+        if (this._printMetadata.noCommaOperator && t.isSequenceExpression(node)){
+          needsParens = true;
+        }
+      }
 
-        if (t.isBinary(node)){
+      let prec = null;
+      if (!needsParens){
+        if (t.isBinaryExpression(node) || t.isLogicalExpression(node)){
           prec = PRECEDENCE[node.operator];
         } else if (t.isUnaryExpression(node) || t.isUpdateExpression(node)){
           prec = node.prefix ? 12 : 13;
@@ -150,24 +154,28 @@ export default class Printer extends Buffer {
           prec = -1;
         }
 
-        // console.log(node.type, prec)
+        // console.log(node.type, prec, 'vs', this._printMetadata.precedence)
 
         if (prec !== null){
           if (prec < this._printMetadata.precedence){
             needsParens = true;
           }
-          this._printMetadata.precedence = prec;
         }
       }
 
-      //console.log(node.type, this._printMetadata, needsParens);
+      let done = () => {
+        if (prec !== null){
+          this._printMetadata.precedence = prec;
+        }
 
-      //let needsParens = n.needsParens(node, parent, this._printStack);
+        cb();
+      };
 
-
-
-      if (needsParens) this.inParens(cb);
-      else cb();
+      if (needsParens){
+        this.inParens(done);
+      } else {
+        done();
+      }
     });
   }
 
@@ -220,7 +228,11 @@ export default class Printer extends Buffer {
   }
 
   inParams(cb){
-    this.inParens(() => cb());
+    this.inParens(() => {
+      this._printMetadata.noCommaOperator = true;
+
+      cb();
+    });
   }
 
   printAuxBeforeComment(wasInAux) {

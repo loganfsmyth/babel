@@ -5,12 +5,43 @@ import Buffer from "./buffer";
 import * as n from "./node";
 import * as t from "babel-types";
 
+const PRECEDENCE = {
+  "||": 0,
+  "&&": 1,
+  "|": 2,
+  "^": 3,
+  "&": 4,
+  "==": 5,
+  "===": 5,
+  "!=": 5,
+  "!==": 5,
+  "<": 6,
+  ">": 6,
+  "<=": 6,
+  ">=": 6,
+  in: 6,
+  instanceof: 6,
+  ">>": 7,
+  "<<": 7,
+  ">>>": 7,
+  "+": 8,
+  "-": 8,
+  "*": 9,
+  "/": 9,
+  "%": 9,
+  "**": 10,
+};
+
+
 export default class Printer extends Buffer {
   constructor(...args) {
     super(...args);
     this.insideAux = false;
     this.printAuxAfterOnNextUserNode = false;
+
     this._printStack = [];
+
+    this._initializePrintMetadata();
   }
 
   print(node, parent, opts = {}) {
@@ -70,30 +101,121 @@ export default class Printer extends Buffer {
     this._printNewline(false, node, parent, opts);
   }
 
+  _push(str){
+    if (str === "\n" || str === " "){
+
+    } else if (str === "default"){
+      this._printMetadata.inStatementBody = true;
+    } else if (str === '=>'){
+      this._printMetadata.inStatementBody = true;
+    } else {
+      this._printMetadata.inStatementBody = false;
+    }
+
+    //console.log(JSON.stringify(str));
+
+    super._push(str);
+  }
+
   _maybeWrapParens(node, parent, cb){
-    let needsParens = n.needsParens(node, parent, this._printStack);
-    if (needsParens) this.push("(");
+    this._cacheParentMetadata(() => {
+      if (t.isExpressionStatement(node)){
+        this._printMetadata.inStatementBody = true;
+      }
+
+
+      let needsParens = false;
+      if (this._printMetadata.inStatementBody && (t.isFunctionExpression(node) || t.isClassExpression(node) || t.isObjectExpression(node))){
+        needsParens = true;
+      }
+
+      if (!needsParens && t.isExpression(node)){
+        let prec = null;
+
+        if (t.isBinary(node)){
+          prec = PRECEDENCE[node.operator];
+        } else if (t.isUnaryExpression(node) || t.isUpdateExpression(node)){
+          prec = node.prefix ? 12 : 13;
+        } else if (t.isCallExpression(node)){
+          prec = 14;
+        } else if(t.isNewExpression(node)){
+          prec = this._printMetadata.precedence > 14 ? 17 : 15;
+        } else if (t.isMemberExpression(node)){
+          prec = 16;
+        } else if (t.isYieldExpression(node) || t.isAwaitExpression(node)){
+          prec = -1;
+        } else if (t.isArrowFunctionExpression(node)){
+          prec = -1;
+        } else if (t.isAssignmentExpression(node)){
+          prec = -1;
+        }
+
+        // console.log(node.type, prec)
+
+        if (prec !== null){
+          if (prec < this._printMetadata.precedence){
+            needsParens = true;
+          }
+          this._printMetadata.precedence = prec;
+        }
+      }
+
+      //console.log(node.type, this._printMetadata, needsParens);
+
+      //let needsParens = n.needsParens(node, parent, this._printStack);
+
+
+
+      if (needsParens) this.inParens(cb);
+      else cb();
+    });
+  }
+
+  _cacheParentMetadata(cb){
+    let {noCommaOperator, inStatementBody, precedence} = this._printMetadata;
 
     cb();
 
-    if (needsParens) this.push(")");
+    this._printMetadata.noCommaOperator = noCommaOperator;
+    this._printMetadata.inStatementBody = inStatementBody;
+    this._printMetadata.precedence = precedence;
+  }
+
+  _clearParentMetadata(cb){
+    this._cacheParentMetadata(() => {
+      this._initializePrintMetadata();
+
+      cb();
+    });
+  }
+
+  _initializePrintMetadata(){
+    this._printMetadata = {
+      noCommaOperator: false,
+      inStatementBody: false,
+      precedence: -20,
+    };
   }
 
   inSquareBrackets(cb){
     this.push("[");
-    cb();
+    this._clearParentMetadata(() => {
+      this._printMetadata.noCommaOperator = true;
+
+      cb();
+    });
     this.push("]");
   }
 
   inCurlyBrackets(cb){
     this.push("{");
-    cb();
+    this._clearParentMetadata(() => cb());
     this.rightBrace();
   }
 
   inParens(cb){
     this.push("(");
-    cb();
+    this._clearParentMetadata(() => cb());
     this.push(")");
   }
 

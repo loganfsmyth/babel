@@ -102,17 +102,16 @@ export default class Printer extends Buffer {
   }
 
   _push(str){
-    if (str === "\n" || str === " "){
+    if (str === "\n" || str === " " || str.match(/ *\/\//)){
 
     } else if (str === "default"){
-      this._printMetadata.inStatementBody = true;
+      this._printMetadata.inStatementBody = "default";
     } else if (str === '=>'){
       this._printMetadata.inStatementBody = true;
     } else {
       this._printMetadata.inStatementBody = false;
     }
 
-    //console.log(JSON.stringify(str));
 
     super._push(str);
   }
@@ -124,28 +123,63 @@ export default class Printer extends Buffer {
       }
 
       let needsParens = false;
-      if (this._printMetadata.inStatementBody && (t.isFunctionExpression(node) || t.isClassExpression(node) || t.isObjectExpression(node))){
-        needsParens = true;
-      }
-
-      if (!needsParens){
-        if (this._printMetadata.noCommaOperator && t.isSequenceExpression(node)){
+      if (this._printMetadata.inStatementBody){
+        if (t.isFunctionExpression(node) || t.isClassExpression(node)){
           needsParens = true;
+        } else if (this._printMetadata.inStatementBody !== 'default'){
+
+          if (t.isObjectExpression(node)){
+            needsParens = true;
+          } else if (t.isAssignmentExpression(node) && t.isObjectPattern(node.left)){
+            needsParens = true;
+          }
         }
       }
 
       let prec = null;
+
       if (!needsParens){
-        if (t.isBinaryExpression(node) || t.isLogicalExpression(node)){
+        if (t.isNullableTypeAnnotation(node) || t.isFunctionTypeAnnotation(node)){
+          prec = -8;
+        } else if (t.isArrayTypeAnnotation(node)){
+          prec = -7;
+        } else if (t.isSequenceExpression(node)){
+          prec = -10;
+        } else if (t.isVariableDeclarator(node)){
+          prec = -9;
+        } else if (t.isBinaryExpression(node)){
+          prec = PRECEDENCE[node.operator];
+
+          if (this._printMetadata.precedence === prec && parent.right === node){
+            needsParens = true;
+          }
+        } else if (t.isLogicalExpression(node)){
           prec = PRECEDENCE[node.operator];
         } else if (t.isUnaryExpression(node) || t.isUpdateExpression(node)){
           prec = node.prefix ? 12 : 13;
-        } else if (t.isCallExpression(node)){
-          prec = 14;
         } else if(t.isNewExpression(node)){
           prec = this._printMetadata.precedence > 14 ? 17 : 15;
+        } else if (t.isCallExpression(node)){
+          prec = 14
         } else if (t.isMemberExpression(node)){
-          prec = 16;
+          let p = node;
+          while (p){
+            p = p.object;
+            if (t.isCallExpression(p)){
+              prec = 14;
+              break;
+            } else if (t.isNewExpression(p)){
+              prec = 15;
+              break;
+            } else if (!t.isMemberExpression(p)){
+              break;
+            }
+          }
+
+          if (prec === null) prec = 16;
+
+        } else if (t.isConditionalExpression(node)){
+          prec = -1;
         } else if (t.isYieldExpression(node) || t.isAwaitExpression(node)){
           prec = -1;
         } else if (t.isArrowFunctionExpression(node)){
@@ -154,7 +188,7 @@ export default class Printer extends Buffer {
           prec = -1;
         }
 
-        // console.log(node.type, prec, 'vs', this._printMetadata.precedence)
+        // console.log(node.type, prec, 'vs', this._printMetadata.precedence, this._printMetadata.inStatementBody)
 
         if (prec !== null){
           if (prec < this._printMetadata.precedence){
@@ -180,11 +214,10 @@ export default class Printer extends Buffer {
   }
 
   _cacheParentMetadata(cb){
-    let {noCommaOperator, inStatementBody, precedence} = this._printMetadata;
+    let {inStatementBody, precedence} = this._printMetadata;
 
     cb();
 
-    this._printMetadata.noCommaOperator = noCommaOperator;
     this._printMetadata.inStatementBody = inStatementBody;
     this._printMetadata.precedence = precedence;
   }
@@ -199,7 +232,6 @@ export default class Printer extends Buffer {
 
   _initializePrintMetadata(){
     this._printMetadata = {
-      noCommaOperator: false,
       inStatementBody: false,
       precedence: -20,
     };
@@ -208,7 +240,7 @@ export default class Printer extends Buffer {
   inSquareBrackets(cb){
     this.push("[");
     this._clearParentMetadata(() => {
-      this._printMetadata.noCommaOperator = true;
+      this._printMetadata.precedence = -9;
 
       cb();
     });
@@ -229,7 +261,7 @@ export default class Printer extends Buffer {
 
   inParams(cb){
     this.inParens(() => {
-      this._printMetadata.noCommaOperator = true;
+      this._printMetadata.precedence = -9;
 
       cb();
     });

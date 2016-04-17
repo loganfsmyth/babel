@@ -79,7 +79,7 @@ export function ExistentialTypeParam() {
 
 export function FunctionTypeAnnotation(node: Object, parent: Object) {
   this.print(node.typeParameters, node);
-  this.inParens(() => {
+  this.inParams(() => {
     this.printList(node.params, node);
 
     if (node.rest) {

@@ -73,7 +73,7 @@ export function NewExpression(node: Object, parent: Object) {
       !t.isMemberExpression(parent) &&
       !t.isNewExpression(parent)) return;
 
-  this.inParens(() => {
+  this.inParams(() => {
     this.printList(node.arguments, node);
   });
 }
@@ -100,7 +100,7 @@ export function CallExpression(node: Object) {
   this.print(node.callee, node);
   if (node.loc) this.printAuxAfterComment();
 
-  this.inParens(() => {
+  this.inParams(() => {
     let isPrettyCall = node._prettyCall && !this.format.retainLines && !this.format.compact;
 
     let separator;

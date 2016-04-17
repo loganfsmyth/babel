@@ -91,6 +91,10 @@ export default class Printer extends Buffer {
     this.push(")");
   }
 
+  inParams(cb){
+    this.inParens(() => cb());
+  }
+
   printAuxBeforeComment(wasInAux) {
     let comment = this.format.auxiliaryCommentBefore;
     if (!wasInAux && this.insideAux && !this.printAuxAfterOnNextUserNode) {

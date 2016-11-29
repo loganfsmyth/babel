@@ -45,6 +45,12 @@ module.exports = {
     hidden: true
   },
 
+  experimentalPluginAPI: {
+    type: "boolean",
+    default: false,
+    hidden: true
+  },
+
   presets: {
     type: "list",
     description: "",

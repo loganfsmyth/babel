@@ -20,6 +20,8 @@ import * as util from  "../../util";
 import path from "path";
 import * as t from "babel-types";
 
+import sortBy from "lodash/sortBy";
+
 import resolve from "../../helpers/resolve";
 
 import blockHoistPlugin from "../internal-plugins/block-hoist";
@@ -464,22 +466,73 @@ export default class File extends Store {
   }
 
   transform(): BabelFileResult {
-    // In the "pass per preset" mode, we have grouped passes.
-    // Otherwise, there is only one plain pluginPasses array.
-    for (let i = 0; i < this.pluginPasses.length; i++) {
-      const pluginPasses = this.pluginPasses[i];
-      this.call("pre", pluginPasses);
-      this.log.debug("Start transform traverse");
+    if (this.opts.experimentalPluginAPI) {
+      if (this.pluginPasses.length > 1) {
+        throw new Error("'experimentalPluginAPI' is not supported alongside 'passPerPreset'.");
+      }
 
-      // merge all plugin visitors into a single visitor
-      let visitor = traverse.visitors.merge(this.pluginVisitors[i], pluginPasses, this.opts.wrapPluginVisitorMethod);
-      traverse(this.ast, visitor, this.scope);
+      const unsupportedPlugins = this.pluginPasses[0].filter((pass) => !pass.plugin.handler);
+      if (unsupportedPlugins.length > 0) {
+        throw new Error("'experimentalPluginAPI' is only supported if all plugins support it.");
+      }
 
-      this.log.debug("End transform traverse");
-      this.call("post", pluginPasses);
+      let ast = t.cloneDeep(this.ast);
+
+      (function freezeDeep(arg) {
+        Object.freeze(arg);
+
+        if (arg && typeof arg === "object") {
+          Object.keys(arg).forEach((key) => freezeDeep(arg[key]));
+        }
+      })(ast);
+
+      ast = this.execPhase("analyse", ast);
+      ast = this.execPhase("transform", ast);
+      ast = this.execPhase("modules", ast);
+      ast = this.execPhase("postprocess", ast);
+
+      this.ast = t.cloneDeep(ast);
+    } else {
+      // In the "pass per preset" mode, we have grouped passes.
+      // Otherwise, there is only one plain pluginPasses array.
+      for (let i = 0; i < this.pluginPasses.length; i++) {
+        this.execVisitorPlugins(this.pluginPasses[i], this.pluginVisitors[i]);
+      }
     }
 
     return this.generate();
+  }
+
+  execVisitorPlugins(pluginPasses, pluginVisitors) {
+    this.call("pre", pluginPasses);
+    this.log.debug("Start transform traverse");
+
+    // merge all plugin visitors into a single visitor
+    let visitor = traverse.visitors.merge(pluginVisitors, pluginPasses, this.opts.wrapPluginVisitorMethod);
+    traverse(this.ast, visitor, this.scope);
+
+    this.log.debug("End transform traverse");
+    this.call("post", pluginPasses);
+  }
+
+  execPhase(runPhase, ast) {
+    const passes = this.pluginPasses[0].filter(({plugin: {phase = "transform"}}) => phase === runPhase);
+    if (passes.length === 0) return ast;
+
+    sortBy(passes, ({plugin: {priority = 1}}) => priority);
+
+    for (let i = 0; i < passes.length; i++) {
+      const pass = passes[i];
+      const result = pass.plugin.handler.call(undefined, ast, pass.opts);
+
+      if (result && result !== ast) {
+        // When a plugin returns a new AST, start executing the plugin handlers from the top.
+        ast = result;
+        i = -1;
+      }
+    }
+
+    return ast;
   }
 
   wrap(code: string, callback: Function): BabelFileResult {

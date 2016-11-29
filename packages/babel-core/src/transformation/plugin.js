@@ -21,6 +21,9 @@ export default class Plugin extends Store {
     this.post              = this.take("post");
     this.pre               = this.take("pre");
     this.visitor           = this.normaliseVisitor(clone(this.take("visitor")) || {});
+    this.phase             = this.take("phase");
+    this.priority          = this.take("priority");
+    this.handler           = this.take("handler");
   }
 
   initialized: boolean;

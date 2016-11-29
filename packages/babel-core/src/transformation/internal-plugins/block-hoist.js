@@ -38,5 +38,8 @@ export default new Plugin({
         });
       }
     }
-  }
+  },
+
+  handler(ast) {
+  },
 });

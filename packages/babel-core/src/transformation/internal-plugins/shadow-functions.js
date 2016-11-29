@@ -28,7 +28,12 @@ export default new Plugin({
         remap(path, "arguments");
       }
     }
-  }
+  },
+
+  handler(ast, options) {
+    // Do nothing because we don't want to rely on automatic shadow processing in the new
+    // plugin architecture.
+  },
 });
 
 function shouldShadow(path, shadowPath) {

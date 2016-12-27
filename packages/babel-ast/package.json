@@ -1,0 +1,8 @@
+{
+  "name": "babel-ast",
+  "version": "6.0.0",
+  "main": "lib/index",
+  "dependencies": {
+    "babel-immutable": "6.0.0"
+  }
+}

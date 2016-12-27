@@ -21,7 +21,7 @@ export class TraversalPath {
   /**
    *
    */
-  _token: Object;
+  _root: ASTState;
   _props: ASTPosition;
 
   constructor(token: string, props: ASTPosition) {
@@ -32,7 +32,7 @@ export class TraversalPath {
   get node() {
     assertActive(this);
 
-    return ASTState.get(this._token).resolve(this._props);
+    return this._root.resolve(this._props);
   }
 
   get type() {
@@ -51,7 +51,7 @@ export class TraversalPath {
    * callback will be automatically destroyed upon completion.
    */
   context<T>(callback: () => T): T {
-    return ASTState.get(this._token).context(callback);
+    return this._root.context(callback);
   }
 
   /**
@@ -60,7 +60,7 @@ export class TraversalPath {
   clone(): this {
     assertActive(this);
 
-    return ASTState.get(this._token).detach(this);
+    return this._root.detach(this);
   }
 
   /**
@@ -78,17 +78,17 @@ export class TraversalPath {
     }
 
     const parentPath = this._props.slice(0, -1);
-    const parent = ASTState.get(this._token).resolve(parentPath);
+    const parent = this._root.resolve(parentPath);
 
     if (Array.isArray(parent)) {
       return {
-        path: ASTState.get(this._token).path(this._props.slice(0, -2)),
+        path: this._root.path(this._props.slice(0, -2)),
         prop: this._props[this._props.length - 2],
         index: this._props[this._props.length - 1],
       };
     } else {
       return {
-        path: ASTState.get(this._token).path(parentPath),
+        path: this._root.path(parentPath),
         prop: this._props[this._props.length - 1],
         index: null,
       };
@@ -111,7 +111,7 @@ export class TraversalPath {
   set(prop: string, value: any): this {
     assertDataProperty(this.node, prop);
 
-    ASTState.get(this._token).replace([...this._props, prop], value);
+    this._root.replace([...this._props, prop], value);
 
     return this;
   }
@@ -132,7 +132,7 @@ export class TraversalPath {
   setChildren(prop: string, children: Array<Node|TraversalPath>, returnPaths: boolean = false) : this|Array<this> {
     assertVisitorProperty(this.node, prop);
 
-    ASTState.get(this._token).replace([...this._props, prop], children.map((child) => unwrapPath(child)));
+    this._root.replace([...this._props, prop], children.map((child) => unwrapPath(child)));
 
     if (returnPaths) return this.children(prop);
     return this;
@@ -149,13 +149,13 @@ export class TraversalPath {
 
     assertVisitorProperty(this.node, props[0]);
 
-    return ASTState.get(this._token).path([...this._props, ...props]);
+    return this._root.path([...this._props, ...props]);
   }
 
   setChild(prop: string, child: Node|TraversalPath, returnPath: boolean = false): this {
     assertVisitorProperty(this.node, prop);
 
-    ASTState.get(this._token).replace([...this._props, prop], unwrapPath(child), true /* invalidateSelf */);
+    this._root.replace([...this._props, prop], unwrapPath(child), true /* invalidateSelf */);
 
     if (returnPath) return this.child(prop);
     return this;
@@ -167,7 +167,7 @@ export class TraversalPath {
   replace(replacement: Node|this): this {
     if (!replacement) throw new Error("A node must be replaced with another node.");
 
-    ASTState.get(this._token).replace(this._props, replacement);
+    this._root.replace(this._props, replacement);
 
     return this;
   }
@@ -180,10 +180,10 @@ export class TraversalPath {
     const {index} = this.parent();
 
     if (index === null) {
-      ASTState.get(this._token).replace(this._props, null);
-      ASTState.get(this._token).destroy(this);
+      this._root.replace(this._props, null);
+      this._root.destroy(this);
     } else {
-      ASTState.get(this._token).remove(this._props);
+      this._root.remove(this._props);
     }
   }
 
@@ -203,7 +203,7 @@ export class TraversalPath {
   }
 
   insertEnd(prop: string, nodes: Array<Node|TraversalPath>, returnPaths: boolean = false): this|Array<this> {
-    const child = ASTState.get(this._token).resolve([...this._props, prop]);
+    const child = this._root.resolve([...this._props, prop]);
 
     return updateItems(this, [...this._props, prop, child.length], nodes, returnPaths);
   }
@@ -216,7 +216,7 @@ function updateItems<T>(path: T, props: ASTPosition, nodes: Array<Node|Traversal
   const multiple = Array.isArray(nodes);
   if (!multiple) nodes = [nodes];
 
-  ASTState.get(path._token).insert(props, nodes.map(child => unwrapPath(child)));
+  this._root.insert(props, nodes.map(child => unwrapPath(child)));
 
   if (!returnPaths) return path;
 
@@ -235,7 +235,7 @@ function unwrapPath(path: TraversalPath): any {
 
   assertActive(path);
 
-  return ASTState.get(path._token).resolve(path._props);
+  return this._root.resolve(path._props);
 }
 
 function assertDataProperty(node: Node, prop: string) {
@@ -257,26 +257,17 @@ function assertActive(path: Node) {
 }
 
 
-const AST_STATES = new WeakMap();
-
 /**
  * The ASTState object tracks the current full state of the AST, and implements our supported mutation operations.
  */
 class ASTState<T: TraversalPath> {
   node: Node;
   _traversalClass: Class<T> = null;
-  _token: Object = {};
   _activePaths: Array<T> = [];
-
-  static get(token) {
-    return AST_STATES.get(token);
-  }
 
   constructor(constr: Class<T>, node) {
     this._traversalClass = constr;
     this.node = node;
-
-    AST_STATES.set(this._token, this);
   }
 
   /**

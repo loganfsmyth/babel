@@ -5,11 +5,20 @@ type Position = Array<string|number>;
 export type Node = {
   type: string;
 };
-export type Path = {
-  active: boolean,
+export type Path = InactivePath|ResolvedPath;
+
+type InactivePath = {
+  active: false,
+  tree: Tree,
+  position: Position,
+  node: Node|null,
+}
+type ResolvedPath = {
+  active: true,
+  tree: Tree,
   position: Position,
   node: Node | null,
-};
+}
 
 /**
  * The State object tracks the current full state of the AST, and implements our supported mutation operations.
@@ -32,6 +41,7 @@ export default class Tree {
   path(position: Position, node: Node | null = null): Path {
     const path = {
       active: true,
+      tree: this,
       position,
       node,
     };
@@ -43,6 +53,8 @@ export default class Tree {
    * Resolve a Path to an AST value, with an optional refinement property.
    */
   get(path: Path, prop?: string): any {
+    if (!path.active) throw new Error();
+
     if (path.node) return prop ? path.node[prop] : path.node;
 
     this._freeze(path, prop);
@@ -56,6 +68,7 @@ export default class Tree {
    * Resolve a Path and update its value, with optional refinement property and index.
    */
   set(path: Path, prop: ?string, value: any): void {
+    if (!path.active) throw new Error();
     this._thaw(path);
 
     let target: any = this._root;
@@ -73,7 +86,7 @@ export default class Tree {
 
     // Invalidate including 'prop' path itself
     this._subpaths(path.position, prop).forEach((p) => {
-      p.active = false;
+      (p: any).active = false;
     });
   }
 
@@ -81,6 +94,8 @@ export default class Tree {
    * Insert an item into an array and update the paths properly.
    */
   insert(path: Path, prop: string, index: number, value: Array<Node>): number {
+    if (!path.active) throw new Error();
+
     this._thaw(path, prop);
 
     const target: any = path.position.reduce((acc: any, prop) => acc[prop], (this._root: any));
@@ -99,6 +114,8 @@ export default class Tree {
    * Remove an item from an array and updarte the paths properly.
    */
   remove(path: Path, prop: string, index: number): number {
+    if (!path.active) throw new Error();
+
     this._thaw(path, prop);
 
     const target: any = path.position.reduce((acc: any, prop) => acc[prop], (this._root: any));
@@ -122,7 +139,9 @@ export default class Tree {
 
     const result = callback();
 
-    for (let i = length; i < this._activePaths.length; i++) this._activePaths[i].active = false;
+    for (let i = length; i < this._activePaths.length; i++) {
+      (this._activePaths[i]: any).active = false;
+    }
     this._activePaths.length = length;
     return result;
   }
@@ -131,7 +150,7 @@ export default class Tree {
    * Given a location in the AST, convert all parent object down to this location from immutable
    * to mutable objects, so that they can be easily updated.
    */
-  _thaw(path: Path, prop: ?string) {
+  _thaw(path: ResolvedPath, prop: ?string) {
     let parent = this._root = Object.isFrozen(this._root) ? Object.assign({}, this._root) : this._root;
 
     const position = prop ? path.position.concat(prop) : path.position;
@@ -146,7 +165,7 @@ export default class Tree {
     }
 
     // Invalidate the node cache of any paths referencing the thawed nodes.
-    this._activePaths.forEach((p: Path) => {
+    this._activePaths.forEach((p) => {
       if (!p.active || !p.node) return;
       if (p.position.length > position.length) return;
       if (!p.position.every((item, i) => item === position[i])) return;
@@ -159,7 +178,7 @@ export default class Tree {
    * Given a location in the AST, convert all child objects from this point into immutable
    * objects so they can be safely exposed to library users.
    */
-  _freeze(path: Path, prop: ?string) {
+  _freeze(path: ResolvedPath, prop: ?string) {
     const position = prop ? path.position.concat(prop) : path.position;
 
     deepFreeze(position.reduce((acc: any, prop) => acc[prop], this._root));
@@ -175,21 +194,26 @@ export default class Tree {
       if (pos[len] < index) return;
 
       if (count < 0 && pos[len] < index - count) {
-        p.active = false;
+        (p: any).active = false;
       }
       pos[position.length] += count;
     });
   }
 
-  _subpaths(position: Position, prop: ?string) {
-    return this._activePaths.filter((p: Path) => {
-      if (!p.active) return false;
-      if (p.position.length > position.length) return false;
+  _subpaths(position: Position, prop: ?string): Array<ResolvedPath> {
+    return this._activePaths.reduce((acc: Array<ResolvedPath>, p: Path) => {
+      if (!p.active) return acc;
+      if (p.position.length > position.length) return acc;
 
-      if (!position.every((item, i) => item === p.position[i])) return false;
+      for (let i = 0; i < position.length; i++) {
+        if (position[i] !== p.position[i]) return acc;
+      }
 
-      return !prop || p.position[position.length] === prop;
-    });
+      if (!prop || p.position[position.length] === prop) {
+        acc.push(p);
+      }
+      return acc;
+    }, []);
   }
 }
 Object.freeze(Tree);

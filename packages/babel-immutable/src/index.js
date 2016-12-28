@@ -16,7 +16,7 @@ export default function enter<T: TraversalPath>(ast: Node, callback: (path: T) =
   const tree = new Tree(ast);
   tree.context(() => {
     const path = tree.path([]);
-    callback(new Traversal(path, tree));
+    callback(new Traversal(path));
   });
   return tree.root();
 }

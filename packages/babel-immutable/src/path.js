@@ -10,24 +10,22 @@ type ASTValue = Array<Node>|Node|string|number|null;
 
 export default class TraversalPath {
   _path: Path;
-  _tree: Tree;
 
   // Expose the path version so libraries can validate it with semver if they want.
   version: string = VERSION;
 
-  constructor(path: Path, tree: Tree) {
+  constructor(path: Path, ...args: Array<void>) {
     this._path = path;
-    this._tree = tree;
   }
 
   node(): Node {
     assertActive(this._path);
 
-    return this._tree.get(this._path);
+    return this._path.tree.get(this._path);
   }
 
   root(): this {
-    return this._createPath(this._tree.path([]));
+    return this._createPath(this._path.tree.path([]));
   }
 
   active() {
@@ -42,7 +40,7 @@ export default class TraversalPath {
   }
 
   context<U>(cb: () => U): U {
-    return this._tree.context(cb);
+    return this._path.tree.context(cb);
   }
 
   parent(): { +parent: this, prop: string, index: number | null } {
@@ -61,7 +59,7 @@ export default class TraversalPath {
     } else {
       parentPos = position.slice(0, -1);
     }
-    const parent = this._createPath(this._tree.path(parentPos));
+    const parent = this._createPath(this._path.tree.path(parentPos));
 
     return { parent, prop, index };
   }
@@ -79,8 +77,8 @@ export default class TraversalPath {
       });
     }
 
-    const path = this._tree.path(this._path.position.concat(...target));
-    const node = this._tree.get(path);
+    const path = this._path.tree.path(this._path.position.concat(...target));
+    const node = this._path.tree.get(path);
 
     return node ? this._createPath(path) : null;
   }
@@ -91,7 +89,7 @@ export default class TraversalPath {
   get(prop: string): ASTValue {
     assertActive(this._path);
 
-    return this._tree.get(this._path, prop);
+    return this._path.tree.get(this._path, prop);
   }
 
   /**
@@ -100,7 +98,7 @@ export default class TraversalPath {
   set(prop: string, value: ASTValue): void {
     assertActive(this._path);
 
-    this._tree.set(this._path, prop, value);
+    this._path.tree.set(this._path, prop, value);
   }
 
   /**
@@ -109,7 +107,7 @@ export default class TraversalPath {
   at(prop: string, index: number) {
     assertActive(this._path);
 
-    return this._createPath(this._tree.path(this._path.position.concat(prop, index)));
+    return this._createPath(this._path.tree.path(this._path.position.concat(prop, index)));
   }
 
   /**
@@ -118,8 +116,8 @@ export default class TraversalPath {
   child(prop: string): this | null {
     assertActive(this._path);
 
-    const path = this._tree.path(this._path.position.concat(prop));
-    const node = this._tree.get(path);
+    const path = this._path.tree.path(this._path.position.concat(prop));
+    const node = this._path.tree.get(path);
 
     return node ? this._createPath(path) : null;
   }
@@ -128,9 +126,9 @@ export default class TraversalPath {
    * Replace a child with a new node.
    */
   setChild(prop: string, child: NodeOrWrapper): this {
-    this._tree.set(this._path, prop, unwrapNode(child));
+    this._path.tree.set(this._path, prop, unwrapNode(child));
 
-    return this._createPath(this._tree.path(this._path.position.concat(prop)));
+    return this._createPath(this._path.tree.path(this._path.position.concat(prop)));
   }
 
   /**
@@ -139,10 +137,10 @@ export default class TraversalPath {
   children(prop: string): PathList<this> | null {
     assertActive(this._path);
 
-    const nodes = this._tree.get(this._path, prop);
+    const nodes = this._path.tree.get(this._path, prop);
 
     return nodes ? nodes.map((node, i) => {
-      const path = this._tree.path(this._path.position.concat(prop, i), node);
+      const path = this._path.tree.path(this._path.position.concat(prop, i), node);
       return this._createPath(path);
     }) : null;
   }
@@ -155,10 +153,10 @@ export default class TraversalPath {
 
     const nodes = unwrapChildren(children);
 
-    this._tree.set(this._path, prop, nodes);
+    this._path.tree.set(this._path, prop, nodes);
 
     return nodes.map((node, i) => {
-      const path = this._tree.path(this._path.position.concat(prop, i), node);
+      const path = this._path.tree.path(this._path.position.concat(prop, i), node);
       return this._createPath(path);
     });
   }
@@ -170,9 +168,9 @@ export default class TraversalPath {
     const {parent, prop, index} = this.parent();
 
     if (index === null) {
-      this._tree.set(parent._path, prop, null);
+      this._path.tree.set(parent._path, prop, null);
     } else {
-      this._tree.remove(parent._path, prop, index);
+      this._path.tree.remove(parent._path, prop, index);
     }
   }
 
@@ -180,10 +178,10 @@ export default class TraversalPath {
    * Replaces the node referenced by this path with a new node, without invalidating the path.
    */
   replaceWith(replacement: NodeOrWrapper): this {
-    this._tree.set(this._path, null, unwrapNode(replacement));
+    this._path.tree.set(this._path, null, unwrapNode(replacement));
 
     // Leave this current path active since it can still point to the new value
-    this._path.active = true;
+    (this._path: any).active = true;
 
     return this;
   }
@@ -230,12 +228,12 @@ export default class TraversalPath {
     const {parent, prop, index} = this.parent();
     if (index === null) throw new Error("Attempting to insert multiple items in non-array item.");
 
-    this._tree.remove(this._path, prop, index);
+    this._path.tree.remove(this._path, prop, index);
 
     const nodes = unwrapChildren(replacement);
-    const offset = this._tree.insert(parent._path, prop, index, nodes);
+    const offset = this._path.tree.insert(parent._path, prop, index, nodes);
 
-    return nodes.map((node, i) => this._createPath(this._tree.path(parent._path.position.concat(offset + i))));
+    return nodes.map((node, i) => this._createPath(this._path.tree.path(parent._path.position.concat(offset + i))));
   }
 
   /**
@@ -282,14 +280,14 @@ export default class TraversalPath {
   _insertMultipleAt(prop: string, index: number, nodes: Array<Node>): Array<TraversalPath> {
     assertActive(this._path);
 
-    const offset = this._tree.insert(this._path, prop, index, nodes);
+    const offset = this._path.tree.insert(this._path, prop, index, nodes);
 
     return nodes.map((node, i) =>
-      this._createPath(this._tree.path(this._path.position.concat(prop, offset + i), node)));
+      this._createPath(this._path.tree.path(this._path.position.concat(prop, offset + i), node)));
   }
 
   _createPath(path: Path): this {
-    return new this.constructor(path, this._tree);
+    return new this.constructor(path);
   }
 }
 Object.freeze(TraversalPath);

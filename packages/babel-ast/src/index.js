@@ -5,8 +5,28 @@ import enterImmutable, {TraversalPath} from "babel-immutable";
 
 import Scope from "./scope";
 
+type NodeType = string;
+
+// TODO: Technically we could generate this type in babel-types and import it.
+type TraversalHandler = {
+  [type: NodeType]: (path: ASTTraversalPath) => void;
+};
+
 class ASTTraversalPath extends TraversalPath {
   _scope: Scope<TraversalPath> | null;
+
+  traverse(handler: TraversalHandler): void {
+    const types = Object.keys(handler);
+    const paths = t.typeQuery(this.node(), types)
+      .map(({position, node}) => this.path(position, node));
+
+    this.context(() => paths.forEach((path) => {
+      if (!path.active()) return;
+
+      const callback = handler[path.node().type];
+      callback(path);
+    }));
+  }
 
   scope(): Scope<this> {
     let scope = this._scope;

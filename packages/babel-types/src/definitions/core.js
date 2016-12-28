@@ -18,6 +18,17 @@ import defineType, {
   assertOneOf,
 } from "./index";
 
+/**
+AST Format:
+
+* name
+* constructor function
+* validator
+* child node lister
+* alias list (do we really need this?)
+
+*/
+
 defineType("ArrayExpression", {
   fields: {
     elements: {

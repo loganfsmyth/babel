@@ -1,7 +1,7 @@
 // @flow
 
 import * as t from "babel-types";
-import enterImmutable, {TraversalPath} from "babel-immutable";
+import TraversalPath from "babel-immutable";
 
 import Scope from "./scope";
 
@@ -61,6 +61,6 @@ class ASTTraversalPath extends TraversalPath {
   }
 }
 
-export default function enter<U>(ast: {type: number}, callback: (path: ASTTraversalPath) => U): U {
-  return enterImmutable(ast, callback, ASTTraversalPath);
+export default function enter(ast: Node, callback: (path: ASTTraversalPath) => void): Node {
+  return ASTTraversalPath.context(ast, callback);
 }

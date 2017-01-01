@@ -1,4 +1,4 @@
-// @flow
+// @ flow
 
 import type {Node, ASTValue} from "./node";
 import type {Position} from "./position";

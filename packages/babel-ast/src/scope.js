@@ -1,4 +1,4 @@
-// @flow
+// @ flow
 
 import {TraversalPath} from "babel-immutable";
 

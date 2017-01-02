@@ -5,7 +5,7 @@ import TraversalPath from "babel-immutable";
 
 import Scope from "./scope";
 
-type Node = {type: "Node"} | {type: "OMG"};
+type Node = BabelNodeImportDeclaration | BabelNodeStringLiteral;
 
 type NodeType = string;
 
@@ -14,7 +14,7 @@ type TraversalHandler = {
   [type: NodeType]: (path: ASTTraversalPath) => void;
 };
 
-class ASTTraversalPath extends TraversalPath {
+class ASTTraversalPath extends TraversalPath<Node> {
   _scope: Scope<ASTTraversalPath> | null;
 
   traverse(handler: TraversalHandler): void {
@@ -37,7 +37,8 @@ class ASTTraversalPath extends TraversalPath {
   }
 
   import(names: string|Array<string|[string, string]>, source: string) {
-    const root = this.root();
+    const root = this.find((p) => p.node().type === "Program");
+    if (!root) throw new Error("Cannot add an import to a detached AST fragment");
 
     const specifiers = [];
 
@@ -58,6 +59,27 @@ class ASTTraversalPath extends TraversalPath {
     }
 
     root.insertStart("body", t.importDeclaration(specifiers, t.stringLiteral(source)));
+  }
+
+  find(callback: (path: this) => boolean): this | null {
+    let path = this;
+
+    while (!callback(path)) {
+      const current = path;
+      const next = path.parent();
+      if (!next) return null;
+
+      path = next.parent;
+      current.destroy();
+    }
+
+    return path;
+  }
+
+  findParent(callback: (path: this) => boolean): this | null {
+    return this.find((path) => {
+      return path === this ? false : callback(path);
+    });
   }
 }
 

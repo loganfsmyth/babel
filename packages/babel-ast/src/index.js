@@ -17,29 +17,45 @@ type TraversalHandler = {
 
 const handlers = {
   onSet: (targetRef: Reference, valueRef: Reference): boolean => {
-    if (!valueRef.get()) return handlers.onRemove(targetRef);
+    const value = valueRef.get();
+    if (value === null && removeHooks(targetRef)) return true;
 
+    const result = targetRef.parent();
+    if (!result) return;
+
+    const {ref} = result;
+
+    if (value && t.isExpression(value) && Array.isArray(ref.get()) ) {
+      valueRef.set(t.expressionStatement(value)).child(["expression"]).set(valueRef);
+      return true;
+    }
     return false;
   },
   // eslint-disable-next-line
   onInsert: (targetRef: Reference, valueRefs: Array<Reference>): boolean => {
+
     return false;
   },
   onRemove: (targetRef: Reference): boolean => {
-    const result = targetRef.parent();
-    if (!result) return false;
-
-    const {ref, prop} = result;
-
-    const value = ref.get();
-    if (value.type === "IfStatement" && prop === "consequent") {
-      ref.set(t.blockStatement([]));
-      return true;
-    }
-
-    return false;
+    return removeHooks(targetRef);
   },
 };
+
+function removeHooks(targetRef): boolean {
+  const result = targetRef.parent();
+  if (!result) return false;
+
+  const {ref, prop} = result;
+
+  const value = ref.get();
+  if (value.type === "IfStatement" && prop === "consequent") {
+    ref.set(t.blockStatement([]));
+    return true;
+  }
+
+  return false;
+
+}
 
 class ASTTraversalPath extends TraversalPath<Node> {
   _scope: Scope<ASTTraversalPath> | null;

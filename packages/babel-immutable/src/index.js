@@ -232,8 +232,8 @@ export default class TraversalPath<Node: Object> {
     return refs;
   }
 
-  _createPath(ref: Reference, inNewContext: boolean = false): this {
-    return new this.constructor(ref, inNewContext ? undefined : this._context);
+  _createPath(ref: Reference): this {
+    return new this.constructor(ref, this._context);
   }
 
   _unwrapPath(input: NodePlaceholder<Node>): RefPlaceholder<Node> {

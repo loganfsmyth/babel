@@ -13,7 +13,7 @@ type TraversalHandler = {
 };
 
 class ASTTraversalPath extends TraversalPath {
-  _scope: Scope<TraversalPath> | null;
+  _scope: Scope<ASTTraversalPath> | null;
 
   traverse(handler: TraversalHandler): void {
     const types = Object.keys(handler);
@@ -21,8 +21,6 @@ class ASTTraversalPath extends TraversalPath {
       .map(({position, node}) => this.path(position, node));
 
     this.context(() => paths.forEach((path) => {
-      if (!path.active()) return;
-
       const callback = handler[path.node().type];
       callback(path);
     }));

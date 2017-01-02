@@ -2,6 +2,7 @@
 
 import * as t from "babel-types";
 import TraversalPath from "babel-immutable";
+import type {Reference} from "babel-immutable";
 
 import Scope from "./scope";
 
@@ -14,8 +15,38 @@ type TraversalHandler = {
   [type: NodeType]: (path: ASTTraversalPath) => void;
 };
 
+const handlers = {
+  onSet: (targetRef: Reference, valueRef: Reference): boolean => {
+    if (!valueRef.get()) return handlers.onRemove(targetRef);
+
+    return false;
+  },
+  // eslint-disable-next-line
+  onInsert: (targetRef: Reference, valueRefs: Array<Reference>): boolean => {
+    return false;
+  },
+  onRemove: (targetRef: Reference): boolean => {
+    const result = targetRef.parent();
+    if (!result) return false;
+
+    const {ref, prop} = result;
+
+    const value = ref.get();
+    if (value.type === "IfStatement" && prop === "consequent") {
+      ref.set(t.blockStatement([]));
+      return true;
+    }
+
+    return false;
+  },
+};
+
 class ASTTraversalPath extends TraversalPath<Node> {
   _scope: Scope<ASTTraversalPath> | null;
+
+  static handlers() {
+    return handlers;
+  }
 
   traverse(handler: TraversalHandler): void {
     const types = Object.keys(handler);
@@ -82,6 +113,8 @@ class ASTTraversalPath extends TraversalPath<Node> {
     });
   }
 }
+Object.freeze(ASTTraversalPath);
+Object.freeze(ASTTraversalPath.prototype);
 
 export default function enter(ast: Node, callback: (path: ASTTraversalPath) => void): Node {
   return ASTTraversalPath.context(ast, callback);

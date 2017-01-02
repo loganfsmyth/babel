@@ -1,7 +1,9 @@
 // @flow
 
 import Tree from "./ast";
-import type {Reference, Position} from "./ast";
+import type {Reference, Position, Handlers} from "./ast";
+
+export type {Reference};
 
 import {version as VERSION} from "../package.json";
 
@@ -16,15 +18,20 @@ export default class TraversalPath<Node: Object> {
 
   baseVersion = VERSION;
 
+  static handlers(): Handlers | null {
+    return null;
+  }
+
   static create(root: Node): this {
-    const tree = new Tree(root);
+    const tree = new Tree(root, this.handlers());
     return new this(tree.ref([]));
   }
 
   static context(root: Node, callback: (path: this) => void): Node {
-    const path = this.create(root);
+    const tree = new Tree(root, this.handlers());
+    const path = new this(tree.ref([]));
     path.context(callback);
-    return path.node();
+    return tree.root();
   }
 
   /**
@@ -72,7 +79,9 @@ export default class TraversalPath<Node: Object> {
   }
 
   clone(inNewContext: boolean = false): this {
-    return this._createPath(new Tree(this.node()).ref([]), inNewContext);
+    if (inNewContext) return this.constructor.create(this.node());
+
+    return this._createPath(this._ref.clone());
   }
 
   node(): Node {
@@ -152,28 +161,9 @@ export default class TraversalPath<Node: Object> {
     return result;
   }
 
-  /**
-   * Provides a hook for child classes to override removal behavior
-   */
-  _onRemove() {
-    // No-op
-  }
-
-  _onInsert(paths: Array<TraversalPath | null>) {
-
-  }
-
-  _onInsertMultiple(path: TraversalPath | null) {
-
-  }
-
   remove(): void {
-    if (this._onRemove()) return;
-
     this._ref.remove();
   }
-
-
 
   replaceWith(replacement: NodePlaceholder<Node>): this | null {
     return this._wrapRef(this._ref.set(this._unwrapPath(replacement)));

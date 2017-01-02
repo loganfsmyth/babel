@@ -7,12 +7,43 @@
 
 export type Position = Array<number|string>;
 
+export type Handlers = {
+  onSet: (targetRef: Reference, valueRef: Reference) => boolean;
+  onInsert: (targetRef: Reference, valueRefs: Array<Reference>) => boolean;
+  onRemove: (targetRef: Reference) => boolean;
+};
+
+function onSet(ref: Reference, value: Reference): boolean {
+  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onSet &&
+      ref._tree._handlers.onSet(ref, value));
+}
+
+function onInsert(ref: Reference, values: Array<Reference>): boolean {
+  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onInsert &&
+      ref._tree._handlers.onInsert(ref, values));
+}
+
+function onRemove(ref: Reference): boolean {
+  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onRemove &&
+      ref._tree._handlers.onRemove(ref));
+}
+
 export default class Tree {
   _root: Object;
   _refs: Map<string, Reference> = new Map();
+  _handlers: Handlers | null = null;
 
-  constructor(root: Object) {
+  constructor(root: Object, handlers: Handlers | null = null) {
     this._root = root;
+    this._handlers = handlers;
+  }
+
+  root(): Object {
+    return this._root;
+  }
+
+  subtree(root: Object): Tree {
+    return new Tree(root, this._handlers);
   }
 
   ref(position: Position): Reference {
@@ -43,7 +74,7 @@ export default class Tree {
       return {
         parent: this,
         prop: "_root",
-        position: [],
+        position: position,
       };
     }
 
@@ -92,7 +123,7 @@ export default class Tree {
    */
   detachPoint(detachFrom: Position) {
     // Bump all removed refs into their own tree.
-    const newTree = new Tree(this.value(detachFrom));
+    const newTree = this.subtree(this.value(detachFrom));
     const baseKey = positionToKey(detachFrom);
 
     for (const [key, ref] of Array.from(this._refs)) {
@@ -151,6 +182,11 @@ export class Reference {
     this._position = position;
   }
 
+  clone(): Reference {
+    const {tree} = this._getActiveRef();
+    return tree.subtree(this.get()).ref([]);
+  }
+
   ref() {
     this._refcount += 1;
   }
@@ -196,6 +232,8 @@ export class Reference {
   set(value: Reference | any): Reference {
     const item = this._standardizeRefs([value])[0];
 
+    if (onSet(this, item)) return item;
+
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
 
@@ -208,6 +246,8 @@ export class Reference {
   }
 
   remove(): void {
+    if (onRemove(this)) return;
+
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
 
@@ -223,6 +263,8 @@ export class Reference {
 
   insert(toInsert: Array<Reference | any>): Array<Reference>  {
     const items = this._standardizeRefs(toInsert);
+
+    if (onInsert(this, items)) return items;
 
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
@@ -247,8 +289,9 @@ export class Reference {
   }
 
   _standardizeRefs(items: Array<Reference | any>): Array<Reference> {
+    const {tree} = this._getActiveRef();
     return items.map((item) => {
-      if (!(item instanceof Reference)) return new Tree(item).ref([]);
+      if (!(item instanceof Reference)) return tree.subtree(item).ref([]);
 
       const {position} = item._getActiveRef();
       if (position.length !== 0) {

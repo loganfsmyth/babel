@@ -75,3 +75,29 @@ gulp.task("watch", ["build-watch"], function (callback) {
     gulp.start("build-watch");
   });
 });
+
+// Adds an 'index.js.flow' file next to each file that Lerna creates in node_modules.
+gulp.task("bootstrap-flow", function() {
+  const NO_INDEX_TYPES = new Set(["babel-runtime", "babel-register", "babel-core"]);
+
+  return gulp.src("./packages/babel-*/node_modules/babel-*/index.js", {read: false, base: __dirname})
+    .pipe(through.obj(function (file, enc, callback) {
+      const name = file.path.match(/node_modules\/(babel-[^/]+)\/index\.js/)[1];
+      const target = "../../../" + name + "/src";
+
+      file.path += ".flow";
+
+      if (NO_INDEX_TYPES.has(name)) {
+        file.contents = new Buffer("");
+      } else {
+        file.contents = new Buffer([
+          "// @flow",
+          "export {default} from \"" + target + "\";",
+          "export * from \"" + target + "\";",
+        ].join("\n") + "\n");
+      }
+
+      callback(null, file);
+    }))
+    .pipe(gulp.dest("./"));
+});

@@ -74,6 +74,7 @@ bootstrap:
 	make clean-all
 	npm install
 	./node_modules/.bin/lerna bootstrap
+	gulp bootstrap-flow
 	make build
 	cd packages/babel-runtime; \
 	npm install; \

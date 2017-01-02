@@ -5,18 +5,14 @@ import type {Reference, Position} from "./ast";
 
 import {version as VERSION} from "../package.json";
 
-type Node = {
-  +type: string,
-  [val: string]: any,
-};
-type PathContext<+T: TraversalPath> = Array<T>;
-type NodePlaceholder = Node | TraversalPath | null;
-type RefPlaceholder = Node | Reference | null;
-type NullablePathList<+T: TraversalPath> = Array<T | null>;
+type PathContext<+T> = Array<T>;
+type NodePlaceholder<Node> = Node | TraversalPath<Node> | null;
+type RefPlaceholder<Node> = Node | Reference | null;
+type NullablePathList<+T> = Array<T | null>;
 
-export default class TraversalPath {
+export default class TraversalPath<Node: Object> {
   _ref: Reference;
-  _context: PathContext<TraversalPath>;
+  _context: PathContext<TraversalPath<Node>>;
 
   baseVersion = VERSION;
 
@@ -35,7 +31,7 @@ export default class TraversalPath {
    * This constructor should essentially be treated as private, and classes subclassing this
    * should pass these values through treating them as opaque arguments.
    */
-  constructor(ref: Reference, context: PathContext<TraversalPath> = []) {
+  constructor(ref: Reference, context: PathContext<TraversalPath<Node>> = []) {
     this._ref = ref;
     this._context = context;
     Object.freeze(this);
@@ -63,8 +59,12 @@ export default class TraversalPath {
     return result;
   }
 
-  contains(path: TraversalPath): boolean {
+  contains(path: TraversalPath<Node>): boolean {
     return this._ref.contains(path._ref);
+  }
+
+  same(path: TraversalPath<Node>): boolean {
+    return this._ref === path._ref;
   }
 
   destroy(): void {
@@ -72,7 +72,7 @@ export default class TraversalPath {
   }
 
   clone(inNewContext: boolean = false): this {
-    return createPath(this, new Tree(this.node()).ref([]), inNewContext);
+    return this._createPath(new Tree(this.node()).ref([]), inNewContext);
   }
 
   node(): Node {
@@ -80,7 +80,7 @@ export default class TraversalPath {
   }
 
   path(position: Position): this | null {
-    return wrapRef(this, this._ref.child(position));
+    return this._wrapRef(this._ref.child(position));
   }
 
   get(prop: string): any {
@@ -92,7 +92,7 @@ export default class TraversalPath {
 
   set(prop: string, value: any): void {
     const child = this._ref.child([prop]);
-    child.set(unwrapPath(value)).deref();
+    child.set(this._unwrapPath(value)).deref();
     child.deref();
   }
 
@@ -106,21 +106,21 @@ export default class TraversalPath {
       if (!arrayParent) return null;
 
       return {
-        parent: createPath(this, arrayParent.ref),
+        parent: this._createPath(arrayParent.ref),
         prop: String(arrayParent.prop),
         index: +parent.prop,
       };
     }
 
     return {
-      parent: createPath(this, parent.ref),
+      parent: this._createPath(parent.ref),
       prop: String(parent.prop),
       index: null,
     };
   }
 
   child(prop: string): this | null {
-    return wrapRef(this, this._ref.child([prop]));
+    return this._wrapRef(this._ref.child([prop]));
   }
 
   children(prop: string): NullablePathList<this> {
@@ -132,19 +132,19 @@ export default class TraversalPath {
   }
 
   at(prop: string, index: number): this | null {
-    return wrapRef(this, this._ref.child([prop, index]));
+    return this._wrapRef(this._ref.child([prop, index]));
   }
 
-  setChild(prop: string, replacement: NodePlaceholder): this | null {
+  setChild(prop: string, replacement: NodePlaceholder<Node>): this | null {
     const child = this._ref.child([prop]);
-    const result = wrapRef(this, child.set(unwrapPath(replacement)));
+    const result = this._wrapRef(child.set(this._unwrapPath(replacement)));
     child.deref();
     return result;
   }
 
-  setChildren(prop: string, replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  setChildren(prop: string, replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     const child = this._ref.child([prop]);
-    const ref = child.set(unwrapPaths(replacement));
+    const ref = child.set(this._unwrapPaths(replacement));
 
     const result = ref.get().map((item, i) => this.at(prop, i));
     child.deref();
@@ -152,63 +152,82 @@ export default class TraversalPath {
     return result;
   }
 
+  /**
+   * Provides a hook for child classes to override removal behavior
+   */
+  _onRemove() {
+    // No-op
+  }
+
+  _onInsert(paths: Array<TraversalPath | null>) {
+
+  }
+
+  _onInsertMultiple(path: TraversalPath | null) {
+
+  }
+
   remove(): void {
+    if (this._onRemove()) return;
+
     this._ref.remove();
   }
 
-  replaceWith(replacement: NodePlaceholder): this | null {
-    return wrapRef(this, this._ref.set(unwrapPath(replacement)));
+
+
+  replaceWith(replacement: NodePlaceholder<Node>): this | null {
+    return this._wrapRef(this._ref.set(this._unwrapPath(replacement)));
   }
 
-  insertBefore(replacement: NodePlaceholder): this | null {
+  insertBefore(replacement: NodePlaceholder<Node>): this | null {
     return this.insertBeforeMultiple([replacement])[0];
   }
 
-  insertAfter(replacement: NodePlaceholder): this | null {
+  insertAfter(replacement: NodePlaceholder<Node>): this | null {
     return this.insertAfterMultiple([replacement])[0];
   }
 
-  insertStart(prop: string, replacement: NodePlaceholder): this | null {
+  insertStart(prop: string, replacement: NodePlaceholder<Node>): this | null {
     return this.insertStartMultiple(prop, [replacement])[0];
   }
 
-  insertEnd(prop: string, replacement: NodePlaceholder): this | null {
+  insertEnd(prop: string, replacement: NodePlaceholder<Node>): this | null {
     return this.insertEndMultiple(prop, [replacement])[0];
   }
 
-  insert(prop: string, index: number = Infinity, replacement: NodePlaceholder): this | null {
+  insert(prop: string, index: number = Infinity, replacement: NodePlaceholder<Node>): this | null {
     return this.insertMultiple(prop, index, [replacement])[0];
   }
 
-  replaceWithMultiple(replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  replaceWithMultiple(replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     const result = this.insertAfterMultiple(replacement);
     this.remove();
     return result;
   }
 
-  insertBeforeMultiple(replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  insertBeforeMultiple(replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     const parent = this.parent();
     if (!parent) throw new Error("Cannot insert before node with no parent");
 
     return parent.parent.insertMultiple(parent.prop, +parent.index, replacement);
   }
 
-  insertAfterMultiple(replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  insertAfterMultiple(replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     const parent = this.parent();
     if (!parent) throw new Error("Cannot insert before node with no parent");
 
     return parent.parent.insertMultiple(parent.prop, parent.index + 1, replacement);
   }
 
-  insertStartMultiple(prop: string, replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  insertStartMultiple(prop: string, replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     return this.insertMultiple(prop, 0, replacement);
   }
 
-  insertEndMultiple(prop: string, replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  insertEndMultiple(prop: string, replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     return this.insertMultiple(prop, Infinity, replacement);
   }
 
-  insertMultiple(prop: string, index: number = Infinity, replacement: Array<NodePlaceholder>): NullablePathList<this> {
+  insertMultiple(prop: string, index: number = Infinity, replacement: Array<NodePlaceholder<Node>>): NullablePathList<this> {
     const child = this._ref.child([prop]);
 
     const array = child.get();
@@ -218,33 +237,40 @@ export default class TraversalPath {
     if (index === Infinity) index = array.length;
 
     const target = this._ref.child([prop, index]);
-    const refs = target.insert(unwrapPaths(replacement)).map((ref) => wrapRef(this, ref));
+    const refs = target.insert(this._unwrapPaths(replacement)).map((ref) => this._wrapRef(ref));
     target.deref();
     return refs;
+  }
+
+  _createPath(ref: Reference, inNewContext: boolean = false): this {
+    return new this.constructor(ref, inNewContext ? undefined : this._context);
+  }
+
+  _unwrapPath(input: NodePlaceholder<Node>): RefPlaceholder<Node> {
+    if (input instanceof TraversalPath) {
+      // Remove the item from its current position before performing other operations.
+      input.remove();
+      return input._ref;
+    }
+
+    return input;
+  }
+
+  _unwrapPaths(input: Array<NodePlaceholder<Node>>): Array<RefPlaceholder<Node>> {
+    return input.map(this._unwrapPath, this);
+  }
+
+  _wrapRef(ref: Reference): this | null {
+    const val = ref.get();
+
+    if (!val || !val.type) {
+      ref.deref();
+      return null;
+    }
+
+    return this._createPath(ref);
   }
 }
 Object.freeze(TraversalPath);
 Object.freeze(TraversalPath.prototype);
 
-function createPath<T: TraversalPath>(path: T, ref: Reference, inNewContext: boolean = false): T {
-  return new path.constructor(ref, inNewContext ? undefined : path._context);
-}
-
-function unwrapPath(input: NodePlaceholder): RefPlaceholder {
-  return input instanceof TraversalPath ? input._ref : input;
-}
-
-function unwrapPaths(input: Array<NodePlaceholder>): Array<RefPlaceholder> {
-  return input.map(unwrapPath);
-}
-
-function wrapRef<T: TraversalPath>(path: T, ref: Reference): T | null {
-  const val = ref.get();
-
-  if (!val || !val.type) {
-    ref.deref();
-    return null;
-  }
-
-  return createPath(path, ref);
-}

@@ -68,54 +68,64 @@ export default class Tree {
     };
   }
 
-  attachTree(position: Position, sourceTree: Tree) {
-    for (const [, ref] of sourceTree._refs) {
-      const active = ref._getActiveRef();
-
-      const pos = position.concat(active._position);
-      const newKey = positionToKey(pos);
+  /**
+   * Take all the refs in the given tree, and move then to this tree at the given
+   * position.
+   *
+   * Note: This could result in overwriting existing refs if used improperly.
+   */
+  attachTree(attachTo: Position, sourceTree: Tree) {
+    for (const [key, ref] of Array.from(sourceTree._refs)) {
+      const {position} = ref._getActiveRef();
+      const pos = attachTo.concat(position);
 
       ref._position = pos;
       ref._tree = this;
-      ref._tree._refs.set(newKey, ref);
+
+      sourceTree._refs.delete(key);
+      this._refs.set(positionToKey(pos), ref);
     }
-    sourceTree._refs.clear();
   }
 
-  shiftPaths(position: Position, prop: number, count: number) {
-    const baseKey = positionToKey(position);
+  /**
+   * Take all refs rooted at the given position and move them into their own tree.
+   */
+  detachPoint(detachFrom: Position) {
+    // Bump all removed refs into their own tree.
+    const newTree = new Tree(this.value(detachFrom));
+    const baseKey = positionToKey(detachFrom);
+
+    for (const [key, ref] of Array.from(this._refs)) {
+      if (!key.startsWith(baseKey)) continue;
+
+      const {position} = ref._getActiveRef();
+      const pos = position.slice(detachFrom.length);
+
+      // Move ref to new tree.
+      ref._tree = newTree;
+      ref._position = pos;
+
+      this._refs.delete(key);
+      newTree._refs.set(positionToKey(pos), ref);
+    }
+  }
+
+  shiftPaths(atPosition: Position, count: number) {
+    const baseKey = positionToKey(atPosition.slice(0, -1));
+    const prop = +atPosition[atPosition.length - 1];
 
     for (const [key, ref] of this._refs) {
       if (!key.startsWith(baseKey)) continue;
-      const active = ref._getActiveRef();
 
-      const offset = +active._position[position.length];
+      const {position} = ref._getActiveRef();
+      const offset = +position[atPosition.length];
 
       if (offset < prop) continue;
 
-      active._position[position.length] = count + active._position[position.length];
-      const newKey = positionToKey(active._position);
-
-      active._tree._refs.delete(key);
-      active._tree._refs.set(newKey, ref);
-    }
-  }
-
-  detachPoint(position: Position) {
-    // Bump all removed refs into their own tree.
-    const newTree = new Tree(this.value(position));
-    const baseKey = positionToKey(position);
-
-    for (const [key, ref] of this._refs) {
-      if (!key.startsWith(baseKey)) continue;
-      const active = ref._getActiveRef();
-
-      // Move ref to new tree.
-      active._tree = newTree;
-      active._position = active._position.slice(position.length);
+      position[atPosition.length] = count + position[atPosition.length];
 
       this._refs.delete(key);
-      newTree._refs.set(positionToKey(active._position), ref);
+      this._refs.set(positionToKey(position), ref);
     }
   }
 }
@@ -130,11 +140,6 @@ function containsPosition(p1: Position, p2: Position): boolean {
 
   return positionToKey(p2).indexOf(positionToKey(p1)) === 0;
 }
-
-type ActiveReference = {
-  _tree: Tree,
-  _position: Position,
-};
 
 export class Reference {
   _refcount: number = 0;
@@ -161,100 +166,104 @@ export class Reference {
   }
 
   child(props: Position): Reference {
-    const active = this._getActiveRef();
-    return active._tree.ref(active._position.concat(props));
+    const {tree, position} = this._getActiveRef();
+    return tree.ref(position.concat(props));
   }
 
   parent(): { ref: Reference, prop: string | number } | null {
-    const active = this._getActiveRef();
-    if (active._position.length === 0) return null;
+    const {tree, position} = this._getActiveRef();
+    if (position.length === 0) return null;
 
-    const prop = active._position[active._position.length - 1];
+    const prop = position[position.length - 1];
     return {
-      ref: active._tree.ref(active._position.slice(0, -1)),
+      ref: tree.ref(position.slice(0, -1)),
       prop,
     };
   }
 
   contains(ref: Reference): boolean {
-    const active = this._getActiveRef();
-    return active._tree === ref._tree && containsPosition(active._position, active._position);
+    const {tree, position} = this._getActiveRef();
+    const {tree: tree2, position: pos2} = ref._getActiveRef();
+
+    return tree === tree2 && containsPosition(position, pos2);
   }
 
   get(): any {
-    const active = this._getActiveRef();
-    return active._tree.value(active._position);
+    const {tree, position} = this._getActiveRef();
+    return tree.value(position);
   }
 
   set(value: Reference | any): Reference {
-    const active = this._getActiveRef();
-    const {parent, prop} = active._tree.mutableParent(active._position);
+    const item = this._standardizeRefs([value])[0];
 
-    this.remove();
+    const {tree, position} = this._getActiveRef();
+    const {parent, prop} = tree.mutableParent(position);
 
-    if (value instanceof Reference) {
-      const activeValue = value._getActiveRef();
-      value.remove();
+    parent[prop] = item.get();
 
-      parent[prop] = value.get();
-      active._tree.attachTree(active._position, activeValue._tree);
+    tree.detachPoint(position);
+    tree.attachTree(position, item._getActiveRef().tree);
 
-      return value;
-    } else {
-      parent[prop] = value;
-      return active._tree.ref(parent.concat(prop));
-    }
+    return item;
   }
 
   remove(): void {
-    const active = this._getActiveRef();
-    active._tree.detachPoint(active._position);
+    const {tree, position} = this._getActiveRef();
+    const {parent, prop} = tree.mutableParent(position);
 
-    const {parent, position, prop} = active._tree.mutableParent(active._position);
-
+    tree.detachPoint(position);
     if (Array.isArray(parent)) {
-      parent.splice(prop, 1);
+      tree.shiftPaths(position, -1);
 
-      active._tree.shiftPaths(position, +prop, -1);
+      parent.splice(prop, 1);
     } else {
       parent[prop] = null;
     }
   }
 
   insert(toInsert: Array<Reference | any>): Array<Reference>  {
-    const active = this._getActiveRef();
-    const {parent, position, prop} = active._tree.mutableParent(active._position);
+    const items = this._standardizeRefs(toInsert);
 
-    const items = toInsert.map((item) => {
-      return item instanceof Reference ? item.get() : null;
+    const {tree, position} = this._getActiveRef();
+    const {parent, prop} = tree.mutableParent(position);
+
+    parent.splice(prop, 0, ...items.map((item) => item.get()));
+
+    tree.shiftPaths(position, items.length);
+
+    items.forEach((ref, i) => {
+      tree.attachTree(position.concat(prop + i), ref._getActiveRef().tree);
     });
 
-    parent.splice(prop, 0, ...items);
-
-    active._tree.shiftPaths(position, +prop, toInsert.length);
-
-    return toInsert.map((item, i) => {
-      if (item instanceof Reference) {
-        item.remove();
-
-        const activeItem = item._getActiveRef();
-        active._tree.attachTree(position.concat(prop + i), activeItem._tree);
-
-        return item;
-      } else {
-        return active._tree.ref(parent.concat(prop + i));
-      }
-    });
+    return items;
   }
 
-  _getActiveRef(): ActiveReference {
-    if (this._refcount === 0) {
+  _getActiveRef(): {tree: Tree, position: Position} {
+    if (this._refcount === 0 || !this._tree || !this._position) {
       throw new Error("Operation cannot be performed in a destroyed ref.");
     }
 
-    return (this: any);
+    return {tree: this._tree, position: this._position};
+  }
+
+  _standardizeRefs(items: Array<Reference | any>): Array<Reference> {
+    return items.map((item) => {
+      if (!(item instanceof Reference)) return new Tree(item).ref([]);
+
+      const {position} = item._getActiveRef();
+      if (position.length !== 0) {
+        throw new Error("AST Reference should be detached before use elsewhere.");
+      }
+
+      if (item.contains(this)) {
+        throw new Error("Cannot insert item inside itself.");
+      }
+
+      return item;
+    });
   }
 }
+
 
 function deepFreeze<T>(o: T): T {
   // Bail once we encounter a frozen node because we will assume for performance reasons

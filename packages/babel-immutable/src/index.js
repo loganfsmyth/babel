@@ -1,7 +1,7 @@
 // @flow
 
 import Tree from "./ast";
-import type {Reference, Position, Handlers} from "./ast";
+import type {Reference, Position} from "./ast";
 
 export type {Reference};
 
@@ -9,7 +9,6 @@ import {version as VERSION} from "../package.json";
 
 type PathContext<+T> = Array<T>;
 type NodePlaceholder<Node> = Node | TraversalPath<Node> | null;
-type RefPlaceholder<Node> = Node | Reference | null;
 type NullablePathList<+T> = Array<T | null>;
 
 export default class TraversalPath<Node: Object> {
@@ -18,22 +17,21 @@ export default class TraversalPath<Node: Object> {
 
   baseVersion = VERSION;
 
-  static handlers(): Handlers | null {
-    return null;
-  }
-
   static create(root: Node): this {
-    const tree = new Tree(root, this.handlers());
+    const tree = new Tree(root);
     return new this(tree.ref([]));
   }
 
   static context(root: Node, callback: (path: this) => void): Node {
-    const tree = new Tree(root, this.handlers());
+    const tree = new Tree(root);
     const path = new this(tree.ref([]));
     path.context(callback);
     path.destroy();
 
-    if (tree._refs.size > 0) throw new Error("Failed to deref all tree references.");
+    if (!tree.empty()) {
+      // TODO: This is probably better as a dev assertion?
+      throw new Error("Failed to clean up all tree references. This is likely a Babel bug.");
+    }
     return tree.root();
   }
 
@@ -103,8 +101,10 @@ export default class TraversalPath<Node: Object> {
   }
 
   set(prop: string, value: any): void {
+    if (value instanceof TraversalPath) throw new Error(".set() used with non-AST value");
+
     const child = this._ref.child([prop]);
-    child.set(this._unwrapPath(value)).deref();
+    child.set(value).deref();
     child.deref();
   }
 
@@ -165,11 +165,11 @@ export default class TraversalPath<Node: Object> {
   }
 
   remove(): void {
-    this._ref.remove();
+    this._onRemove(this._ref);
   }
 
   replaceWith(replacement: NodePlaceholder<Node>): this | null {
-    return this._wrapRef(this._ref.set(this._unwrapPath(replacement)));
+    return this._wrapRef(this._onReplace(this._ref, this._unwrapPath(replacement)));
   }
 
   insertBefore(replacement: NodePlaceholder<Node>): this | null {
@@ -230,26 +230,38 @@ export default class TraversalPath<Node: Object> {
     if (index === Infinity) index = array.length;
 
     const target = this._ref.child([prop, index]);
-    const refs = target.insert(this._unwrapPaths(replacement)).map((ref) => this._wrapRef(ref));
+    const refs = this._onInsert(target, this._unwrapPaths(replacement)).map((ref) => this._wrapRef(ref));
     target.deref();
     return refs;
+  }
+
+  _onReplace(ref: Reference, item: Reference): Reference {
+    return ref.set(item);
+  }
+
+  _onRemove(ref: Reference): void {
+    ref.remove();
+  }
+
+  _onInsert(ref: Reference, items: Array<Reference>) {
+    return ref.insert(items);
   }
 
   _createPath(ref: Reference): this {
     return new this.constructor(ref);
   }
 
-  _unwrapPath(input: NodePlaceholder<Node>): RefPlaceholder<Node> {
+  _unwrapPath(input: NodePlaceholder<Node>): Reference {
     if (input instanceof TraversalPath) {
       // Remove the item from its current position before performing other operations.
       input.remove();
       return input._ref;
     }
 
-    return input;
+    return new Tree(input).ref([]);
   }
 
-  _unwrapPaths(input: Array<NodePlaceholder<Node>>): Array<RefPlaceholder<Node>> {
+  _unwrapPaths(input: Array<NodePlaceholder<Node>>): Array<Reference> {
     return input.map(this._unwrapPath, this);
   }
 

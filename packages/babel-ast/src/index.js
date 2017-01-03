@@ -6,6 +6,8 @@ import type {Reference} from "babel-immutable";
 
 import Scope from "./scope";
 
+export type {ASTTraversalPath};
+
 type Node = BabelNodeImportDeclaration | BabelNodeStringLiteral | BabelNodeProgram;
 
 type NodeType = string;
@@ -39,7 +41,7 @@ const handlers = {
 
     return false;
   },
-  onRemove: (targetRef: Reference): boolean => {
+  _onRemove: (targetRef: Reference): boolean => {
     return removeHooks(targetRef);
   },
 };
@@ -61,24 +63,24 @@ function removeHooks(targetRef): boolean {
 }
 
 class ASTTraversalPath extends TraversalPath<Node> {
-  _scope: Scope<ASTTraversalPath> | null;
+  _scope: Scope | null;
 
   static handlers() {
     return handlers;
   }
 
   traverse(handler: TraversalHandler): void {
-    const types = Object.keys(handler);
-    const paths = [];//t.typeQuery(this.node(), types)
-      // .map(({position, node}) => this.path(position, node));
+    // const types = Object.keys(handler);
+    // const paths = [];//t.typeQuery(this.node(), types)
+       // .map(({position, node}) => this.path(position, node));
 
-    this.context(() => paths.forEach((path) => {
-      const callback = handler[path.node().type];
-      callback(path);
-    }));
+    // this.context(() => paths.forEach((path) => {
+    //   const callback = handler[path.node().type];
+    //   callback(path);
+    // }));
   }
 
-  scope(): Scope<this> {
+  scope(): Scope {
     let scope = this._scope;
     if (!scope) {
       scope = this._scope = new Scope(this);
@@ -86,8 +88,11 @@ class ASTTraversalPath extends TraversalPath<Node> {
     return scope;
   }
 
+
   import(names: string|Array<string|[string, string]>, source: string) {
-    const root = this.find((p) => p.node().type === "Program" ? p : null);
+    const root = this.find((p) => {
+      return p.node().type === "Program" ? p : null;
+    });
     if (!root) throw new Error("Cannot add an import to a detached AST fragment");
     // if (root.node().sourceType !== "module") throw new Error("Cannot insert an import in a non-ES6 module");
 
@@ -128,9 +133,9 @@ class ASTTraversalPath extends TraversalPath<Node> {
     return path;
   }
 
-  findParent(callback: (path: this) => boolean): this | null {
+  findParent<T: Node>(callback: (path: this) => TraversalPath<T> | null): TraversalPath<T> | null {
     return this.find((path) => {
-      return path === this ? false : callback(path);
+      return path === this ? null : callback(path);
     });
   }
 }

@@ -6,44 +6,26 @@
  */
 
 export type Position = Array<number|string>;
-
-export type Handlers = {
-  onSet: (targetRef: Reference, valueRef: Reference) => boolean;
-  onInsert: (targetRef: Reference, valueRefs: Array<Reference>) => boolean;
-  onRemove: (targetRef: Reference) => boolean;
-};
-
-function onSet(ref: Reference, value: Reference): boolean {
-  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onSet &&
-      ref._tree._handlers.onSet(ref, value));
-}
-
-function onInsert(ref: Reference, values: Array<Reference>): boolean {
-  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onInsert &&
-      ref._tree._handlers.onInsert(ref, values));
-}
-
-function onRemove(ref: Reference): boolean {
-  return !!(ref._tree && ref._tree._handlers && ref._tree._handlers.onRemove &&
-      ref._tree._handlers.onRemove(ref));
-}
+export type {Reference};
 
 export default class Tree {
-  _root: Object;
+  _root: any;
   _refs: Map<string, Reference> = new Map();
-  _handlers: Handlers | null = null;
 
-  constructor(root: Object, handlers: Handlers | null = null) {
+  constructor(root: any) {
     this._root = root;
-    this._handlers = handlers;
   }
 
-  root(): Object {
+  root(): any {
     return this._root;
   }
 
-  subtree(root: Object): Tree {
-    return new Tree(root, this._handlers);
+  subtree(root: any): Tree {
+    return new Tree(root);
+  }
+
+  empty(): boolean {
+    return this._refs.size === 0;
   }
 
   ref(position: Position): Reference {
@@ -52,8 +34,9 @@ export default class Tree {
     if (!ref) {
       ref = new Reference(this, position);
       this._refs.set(key, ref);
+    } else {
+      ref.ref();
     }
-    ref.ref();
 
     return ref;
   }
@@ -64,7 +47,7 @@ export default class Tree {
 
   value(position: Position): any {
     // TODO: This value can be cached in immutable trees.
-    const val = position.reduce((acc, prop) => acc[prop], this._root);
+    const val = position.reduce((acc: any, prop) => acc[prop], this._root);
 
     return deepFreeze(val);
   }
@@ -172,8 +155,8 @@ function containsPosition(p1: Position, p2: Position): boolean {
   return positionToKey(p2).indexOf(positionToKey(p1)) === 0;
 }
 
-export class Reference {
-  _refcount: number = 0;
+class Reference {
+  _refcount: number = 1;
   _tree: Tree | null = null;
   _position: Position | null = null;
 
@@ -188,6 +171,8 @@ export class Reference {
   }
 
   ref() {
+    if (this._refcount === 0) throw new Error();
+
     this._refcount += 1;
   }
 
@@ -232,8 +217,6 @@ export class Reference {
   set(value: Reference | any): Reference {
     const item = this._standardizeRefs([value])[0];
 
-    if (onSet(this, item)) return item;
-
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
 
@@ -246,8 +229,6 @@ export class Reference {
   }
 
   remove(): void {
-    if (onRemove(this)) return;
-
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
 
@@ -263,8 +244,6 @@ export class Reference {
 
   insert(toInsert: Array<Reference | any>): Array<Reference>  {
     const items = this._standardizeRefs(toInsert);
-
-    if (onInsert(this, items)) return items;
 
     const {tree, position} = this._getActiveRef();
     const {parent, prop} = tree.mutableParent(position);
@@ -306,7 +285,6 @@ export class Reference {
     });
   }
 }
-
 
 function deepFreeze<T>(o: T): T {
   // Bail once we encounter a frozen node because we will assume for performance reasons

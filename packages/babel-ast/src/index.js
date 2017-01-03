@@ -6,7 +6,7 @@ import type {Reference} from "babel-immutable";
 
 import Scope from "./scope";
 
-type Node = BabelNodeImportDeclaration | BabelNodeStringLiteral;
+type Node = BabelNodeImportDeclaration | BabelNodeStringLiteral | BabelNodeProgram;
 
 type NodeType = string;
 
@@ -21,13 +21,16 @@ const handlers = {
     if (value === null && removeHooks(targetRef)) return true;
 
     const result = targetRef.parent();
-    if (!result) return;
+    if (!result) return false;
 
     const {ref} = result;
 
-    if (value && t.isExpression(value) && Array.isArray(ref.get()) ) {
-      valueRef.set(t.expressionStatement(value)).child(["expression"]).set(valueRef);
-      return true;
+    if (value && t.isExpression(value) && Array.isArray(ref.get())) {
+      const result2 = ref.parent();
+      if (result2 && result2.ref.get().type === "BlockStatement") {
+        valueRef.set(t.expressionStatement(value)).child(["expression"]).set(valueRef);
+        return true;
+      }
     }
     return false;
   },
@@ -84,8 +87,9 @@ class ASTTraversalPath extends TraversalPath<Node> {
   }
 
   import(names: string|Array<string|[string, string]>, source: string) {
-    const root = this.find((p) => p.node().type === "Program");
+    const root = this.find((p) => p.node().type === "Program" ? p : null);
     if (!root) throw new Error("Cannot add an import to a detached AST fragment");
+    // if (root.node().sourceType !== "module") throw new Error("Cannot insert an import in a non-ES6 module");
 
     const specifiers = [];
 
@@ -108,17 +112,18 @@ class ASTTraversalPath extends TraversalPath<Node> {
     root.insertStart("body", t.importDeclaration(specifiers, t.stringLiteral(source)));
   }
 
-  find(callback: (path: this) => boolean): this | null {
+  find<T: Node>(callback: (path: this) => TraversalPath<T> | null): TraversalPath<T> | null {
     let path = this;
 
-    while (!callback(path)) {
+    do {
+      const result = callback(path);
+      if (result) return result;
+
       const current = path;
       const next = path.parent();
-      if (!next) return null;
-
-      path = next.parent;
+      path = next && next.parent;
       current.destroy();
-    }
+    } while (path);
 
     return path;
   }

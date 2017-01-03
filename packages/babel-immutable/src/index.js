@@ -31,6 +31,9 @@ export default class TraversalPath<Node: Object> {
     const tree = new Tree(root, this.handlers());
     const path = new this(tree.ref([]));
     path.context(callback);
+    path.destroy();
+
+    if (tree._refs.size > 0) throw new Error("Failed to deref all tree references.");
     return tree.root();
   }
 
@@ -233,7 +236,7 @@ export default class TraversalPath<Node: Object> {
   }
 
   _createPath(ref: Reference): this {
-    return new this.constructor(ref, this._context);
+    return new this.constructor(ref);
   }
 
   _unwrapPath(input: NodePlaceholder<Node>): RefPlaceholder<Node> {

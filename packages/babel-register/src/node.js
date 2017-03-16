@@ -1,4 +1,3 @@
-import deepClone from "lodash/cloneDeep";
 import sourceMapSupport from "source-map-support";
 import * as registerCache from "./cache";
 import escapeRegExp from "lodash/escapeRegExp";
@@ -9,7 +8,7 @@ import fs from "fs";
 import path from "path";
 
 const maps = {};
-const transformOpts = {};
+let transformOpts = {};
 let piratesRevert = null;
 
 sourceMapSupport.install({
@@ -36,12 +35,16 @@ function mtime(filename) {
 }
 
 function compile(code, filename) {
+  const baseOpts = {
+    filename,
+    sourceRoot: undefined,
+  };
+  if (transformOpts.sourceRoot !== undefined) {
+    baseOpts.sourceRoot = path.dirname(filename);
+  }
+
   // merge in base options and resolve all the plugins and presets relative to this file
-  const opts = new OptionManager().init(Object.assign(
-    { sourceRoot: path.dirname(filename) }, // sourceRoot can be overwritten
-    deepClone(transformOpts),
-    { filename }
-  ));
+  const opts = new OptionManager().init(baseOpts, transformOpts);
 
   // Bail out ASAP if the file has been ignored.
   if (opts === null) return code;
@@ -99,7 +102,7 @@ export default function register(opts?: Object = {}) {
   delete opts.extensions;
   delete opts.cache;
 
-  Object.assign(transformOpts, opts);
+  transformOpts = Object.assign({}, transformOpts, opts);
 
   if (!transformOpts.ignore && !transformOpts.only) {
     transformOpts.ignore = [

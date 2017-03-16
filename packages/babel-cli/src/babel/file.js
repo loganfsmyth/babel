@@ -7,7 +7,7 @@ import fs from "fs";
 
 import * as util from "./util";
 
-export default function (commander, filenames, opts) {
+export default function (commander, filenames, opts, staticOpts) {
   if (commander.sourceMaps === "inline") {
     opts.sourceMaps = true;
   }
@@ -97,9 +97,9 @@ export default function (commander, filenames, opts) {
     });
 
     process.stdin.on("end", function () {
-      results.push(util.transform(commander.filename, code, defaults({
+      results.push(util.transform(code, defaults({
         sourceFileName: "stdin",
-      }, opts)));
+      }, opts), staticOpts));
       output();
     });
   };
@@ -132,7 +132,7 @@ export default function (commander, filenames, opts) {
 
       const data = util.compile(filename, defaults({
         sourceFileName: sourceFilename,
-      }, opts));
+      }, opts), staticOpts);
 
       if (!data) return;
 

@@ -34,17 +34,13 @@ export function log(msg) {
   if (!commander.quiet) console.log(msg);
 }
 
-export function transform(filename, code, opts) {
-  opts = Object.assign({}, opts, {
-    filename,
-  });
-
-  return babel.transform(code, opts);
+export function transform(code, opts, staticOpts) {
+  return babel.transform(code, opts, staticOpts);
 }
 
-export function compile(filename, opts) {
+export function compile(filename, opts, staticOpts) {
   try {
-    return babel.transformFileSync(filename, opts);
+    return babel.transformFileSync(filename, opts, staticOpts);
   } catch (err) {
     if (commander.watch) {
       console.error(toErrorStack(err));

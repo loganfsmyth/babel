@@ -127,23 +127,30 @@ if (errors.length) {
 
 //
 
-const opts = commander.opts();
+const staticOpts = commander.opts();
 
 // Delete options that are specific to babel-cli and shouldn't be passed to babel-core.
-delete opts.version;
-delete opts.extensions;
-delete opts.watch;
-delete opts.skipInitialBuild;
-delete opts.outFile;
-delete opts.outDir;
-delete opts.copyFiles;
-delete opts.quiet;
+delete staticOpts.version;
+delete staticOpts.extensions;
+delete staticOpts.watch;
+delete staticOpts.skipInitialBuild;
+delete staticOpts.outFile;
+delete staticOpts.outDir;
+delete staticOpts.copyFiles;
+delete staticOpts.quiet;
 
 // Commander will default the "--no-" arguments to true, but we want to leave them undefined so that
 // babel-core can handle the default-assignment logic on its own.
-if (opts.babelrc === true) opts.babelrc = undefined;
-if (opts.comments === true) opts.comments = undefined;
-if (opts.highlightCode === true) opts.highlightCode = undefined;
+if (staticOpts.babelrc === true) staticOpts.babelrc = undefined;
+if (staticOpts.comments === true) staticOpts.comments = undefined;
+if (staticOpts.highlightCode === true) staticOpts.highlightCode = undefined;
+
+const opts = {
+  filename: staticOpts.filename,
+  babelrc: staticOpts.babelrc,
+};
+delete staticOpts.filename;
+delete staticOpts.babelrc;
 
 const fn = commander.outDir ? dirCommand : fileCommand;
-fn(commander, filenames, opts);
+fn(commander, filenames, opts, staticOpts);

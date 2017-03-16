@@ -6,7 +6,7 @@ import fs from "fs";
 
 import * as util from "./util";
 
-export default function (commander, filenames, opts) {
+export default function (commander, filenames, opts, staticOpts) {
   function write(src, relative) {
     if (!util.isCompilableExtension(relative, commander.extensions)) return false;
 
@@ -18,7 +18,7 @@ export default function (commander, filenames, opts) {
     const data = util.compile(src, defaults({
       sourceFileName: slash(path.relative(dest + "/..", src)),
       sourceMapTarget: path.basename(relative),
-    }, opts));
+    }, opts), staticOpts);
 
     if (!data) return false;
 

@@ -12,16 +12,16 @@ export template from "babel-template";
 
 import loadConfig from "./config";
 
-export function loadOptions(opts): Object|null {
-  const config = loadConfig(opts);
+export function loadOptions(opts, staticOpts): Object|null {
+  const config = loadConfig(opts, staticOpts);
 
   return config ? config.options : null;
 }
 
 // For easier backward-compatibility, provide an API like the one we exposed in Babel 6.
 export class OptionManager {
-  init(opts) {
-    return loadOptions(opts);
+  init(opts, staticOpts) {
+    return loadOptions(opts, staticOpts);
   }
 }
 

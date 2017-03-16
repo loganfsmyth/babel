@@ -14,7 +14,7 @@ type ConfigItem = {
   loc: string,
 };
 
-export default function buildConfigChain(opts: {}): Array<ConfigItem>|null {
+export default function buildConfigChain(opts: {}, staticOpts: ?{}): Array<ConfigItem>|null {
   if (typeof opts.filename !== "string" && opts.filename != null) {
     throw new Error(".filename must be a string, null, or undefined");
   }
@@ -23,12 +23,23 @@ export default function buildConfigChain(opts: {}): Array<ConfigItem>|null {
   const builder = new ConfigChainBuilder(filename);
 
   try {
+    const dirname = process.cwd();
+
     builder.mergeConfig({
       type: "arguments",
       options: opts,
       alias: "base",
-      dirname: process.cwd(),
+      dirname,
     });
+
+    if (staticOpts) {
+      builder.mergeConfig({
+        type: "options",
+        options: staticOpts,
+        alias: "base-immutable",
+        dirname,
+      });
+    }
 
     // resolve all .babelrc files
     if (opts.babelrc !== false && filename) {

@@ -72,11 +72,11 @@ const ALLOWED_PLUGIN_KEYS = new Set([
   "inherits",
 ]);
 
-export default function manageOptions(opts: {}): {
+export default function manageOptions(opts: {}, staticOpts: ?{}): {
   options: Object,
   passes: Array<Array<[ Plugin, ?{} ]>>,
 }|null {
-  return new OptionManager().init(opts);
+  return new OptionManager().init(opts, staticOpts);
 }
 
 class OptionManager {
@@ -136,8 +136,8 @@ class OptionManager {
     merge(this.options, result.options);
   }
 
-  init(opts: {}) {
-    const configChain = buildConfigChain(opts);
+  init(opts: {}, staticOpts: ?{}) {
+    const configChain = buildConfigChain(opts, staticOpts);
     if (!configChain) return null;
 
     try {

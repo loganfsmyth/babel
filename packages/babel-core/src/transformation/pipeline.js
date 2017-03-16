@@ -5,7 +5,11 @@ import * as t from "babel-types";
 import File from "./file";
 import loadConfig from "../config";
 
-export function analyse(code: string, opts: Object = {}, visitor?: Object): ?BabelFileMetadata {
+export function analyse(
+  code: string,
+  opts: Object = {},
+  visitor?: Object,
+): ?BabelFileMetadata {
   opts.code = false;
   if (visitor) {
     opts.plugins = opts.plugins || [];
@@ -14,8 +18,12 @@ export function analyse(code: string, opts: Object = {}, visitor?: Object): ?Bab
   return transform(code, opts).metadata;
 }
 
-export function transform(code: string, opts?: Object): BabelFileResult {
-  const config = loadConfig(opts);
+export function transform(
+  code: string,
+  opts?: Object,
+  staticOpts?: Object,
+): BabelFileResult {
+  const config = loadConfig(opts, staticOpts);
   if (config === null) return null;
 
   const file = new File(config);
@@ -26,8 +34,13 @@ export function transform(code: string, opts?: Object): BabelFileResult {
   });
 }
 
-export function transformFromAst(ast: Object, code: string, opts: Object): BabelFileResult {
-  const config = loadConfig(opts);
+export function transformFromAst(
+  ast: Object,
+  code: string,
+  opts: Object,
+  staticOpts?: Object,
+): BabelFileResult {
+  const config = loadConfig(opts, staticOpts);
   if (config === null) return null;
 
   if (ast && ast.type === "Program") {
@@ -44,14 +57,24 @@ export function transformFromAst(ast: Object, code: string, opts: Object): Babel
   });
 }
 
-export function transformFile(filename: string, opts?: Object, callback: Function) {
+export function transformFile(
+  filename: string,
+  opts?: Object,
+  staticOpts?: Object,
+  callback: Function,
+) {
   if (typeof opts === "function") {
     callback = opts;
+    staticOpts = undefined;
     opts = {};
+  }
+  if (typeof staticOpts === "function") {
+    callback = staticOpts;
+    staticOpts = undefined;
   }
 
   opts.filename = filename;
-  const config = loadConfig(opts);
+  const config = loadConfig(opts, staticOpts);
   if (config === null) return callback(null, null);
 
   fs.readFile(filename, function (err, code) {
@@ -78,9 +101,13 @@ export function transformFile(filename: string, opts?: Object, callback: Functio
   });
 }
 
-export function transformFileSync(filename: string, opts?: Object = {}): string {
+export function transformFileSync(
+  filename: string,
+  opts?: Object = {},
+  staticOpts?: Object,
+): string {
   opts.filename = filename;
-  const config = loadConfig(opts);
+  const config = loadConfig(opts, staticOpts);
   if (config === null) return null;
 
   const code = fs.readFileSync(filename, "utf8");

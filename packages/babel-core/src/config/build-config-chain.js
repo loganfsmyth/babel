@@ -3,6 +3,7 @@
 import { getEnv } from "./helpers/environment";
 import path from "path";
 import micromatch from "micromatch";
+import { makeWeakCache } from "./caching";
 
 import { findConfigs, loadConfig } from "./loading/files";
 
@@ -22,22 +23,19 @@ export default function buildConfigChain(opts: {}): Array<ConfigItem>|null {
   const filename = opts.filename ? path.resolve(opts.filename) : null;
   const builder = new ConfigChainBuilder(filename);
 
-  try {
-    builder.mergeConfig({
-      type: "arguments",
-      options: opts,
-      alias: "base",
-      dirname: process.cwd(),
-    });
+  const merged = builder.mergeConfig({
+    options: opts,
+    dirname: process.cwd(),
+  }, true /* skipCache */);
+  if (!merged) return null;
 
-    // resolve all .babelrc files
-    if (opts.babelrc !== false && filename) {
-      builder.findConfigs(filename);
+  // resolve all .babelrc files
+  if (opts.babelrc !== false && filename) {
+    for (const config of findConfigs(path.dirname(filename))) {
+      const merged = builder.mergeConfig(config);
+
+      if (!merged) return null;
     }
-  } catch (e) {
-    if (e.code !== "BABEL_IGNORED_FILE") throw e;
-
-    return null;
   }
 
   return builder.configs.reverse();
@@ -139,79 +137,127 @@ class ConfigChainBuilder {
     return false;
   }
 
-  findConfigs(loc: string) {
-    findConfigs(path.dirname(loc)).forEach(({ filepath, dirname, options }) => {
-      this.mergeConfig({
-        type: "options",
-        options,
-        alias: filepath,
-        dirname,
-      });
-    });
-  }
+  mergeConfig(config, skipCache): boolean {
+    // Skipping the cache here is a performance optimization for the passed-in arguments, since
+    // they will always be a new object and thrashing the cache just adds extra time. It appears
+    // to make config loading ~15% faster.
+    const items = skipCache ? filteredConfig(config) : cachedFilteredConfig(config);
 
-  mergeConfig({
-    type,
-    options: rawOpts,
-    alias,
-    dirname,
-  }) {
-    // Bail out ASAP if this file is ignored so that we run as little logic as possible on ignored files.
-    if (this.filename && this.shouldIgnore(rawOpts.ignore || null, rawOpts.only || null, dirname)) {
-      // TODO(logan): This is a really cross way to bail out. Avoid this in rewrite.
-      throw Object.assign((new Error("This file has been ignored."): any), { code: "BABEL_IGNORED_FILE" });
+    for (const item of items) {
+      if (item.type === "extends") continue;
+
+      const { options, dirname } = item;
+
+      // Bail out ASAP if this file is ignored so that we run as little logic as possible on ignored files.
+      if (
+        this.filename &&
+        this.shouldIgnore(options.ignore || null, options.only || null, dirname)
+      ) {
+        return false;
+      }
     }
 
+    for (const item of items) {
+      if (item.type === "extends") {
+        const extendsConfig = loadConfig(item.extends, item.dirname);
+
+        const existingConfig = this.configs.some((config) => config.alias === extendsConfig.filepath);
+        if (!existingConfig) {
+          const merged = this.mergeConfig(extendsConfig);
+
+          if (!merged) return false;
+        }
+      } else {
+        this.configs.push(item);
+      }
+    }
+
+    return true;
+  }
+}
+
+/**
+ * Given a config object, flatten it based on the current environment, consistently returning the same
+ * objects if the same input object and environment is used.
+ */
+const cachedFilteredConfig = makeWeakCache((config, cache) => {
+  return filterByEnv(cachedFlattenConfig(config), cache.using(() => getEnv()));
+});
+const cachedFlattenConfig = makeWeakCache(flattenConfig);
+
+/**
+ * Given a config object, flatten it based on the current environment, consistently returning the same
+ * objects if the same input object and environment is used.
+ */
+function filteredConfig(config) {
+  return filterByEnv(flattenConfig(config), getEnv());
+}
+
+function filterByEnv(configs, envKey) {
+  return configs.filter((config) => typeof config.envKey !== "string" || config.envKey === envKey);
+}
+
+type ExtendsItem = { type: "extends", extends: string, dirname: string };
+
+/**
+ * Flatten the config and generate unique items for each nested config. This set of items is created
+ * without taking the current environnment into account so that they can be cached without needing to
+ * invalidate config items that are not tied to the environment.
+ */
+function flattenConfig(config): Array<ConfigItem|ExtendsItem> {
+  const rootType = config.filepath ? "options" : "arguments";
+  const dirname = config.dirname;
+  const rootAlias = config.filepath || "base";
+
+  const configs = [];
+
+  (function buildNestedConfig(rawOpts, activeEnvKey, activeAlias) {
     const options = Object.assign({}, rawOpts);
     delete options.env;
     delete options.extends;
 
-    const envKey = getEnv();
-
     if (rawOpts.env != null && (typeof rawOpts.env !== "object" || Array.isArray(rawOpts.env))) {
       throw new Error(".env block must be an object, null, or undefined");
     }
+    const env = rawOpts.env;
 
-    const envOpts = rawOpts.env && rawOpts.env[envKey];
+    if (env) {
+      for (const envKey of Object.keys(env)) {
+        if (activeEnvKey !== undefined && activeEnvKey !== envKey) continue;
 
-    if (envOpts != null && (typeof envOpts !== "object" || Array.isArray(envOpts))) {
-      throw new Error(".env[...] block must be an object, null, or undefined");
-    }
+        const value = env[envKey];
 
-    if (envOpts) {
-      this.mergeConfig({
-        type,
-        options: envOpts,
-        alias: `${alias}.env.${envKey}`,
-        dirname: dirname,
-      });
-    }
+        if (value != null && (typeof value !== "object" || Array.isArray(value))) {
+          throw new Error(`.env[${envKey}] block must be an object, null, or undefined`);
+        }
 
-    this.configs.push({
-      type,
-      options,
-      alias,
-      loc: alias,
-      dirname,
-    });
-
-    if (rawOpts.extends) {
-      if (typeof rawOpts.extends !== "string") throw new Error(".extends must be a string");
-
-      const extendsConfig = loadConfig(rawOpts.extends, dirname);
-
-      const existingConfig = this.configs.some((config) => {
-        return config.alias === extendsConfig.filepath;
-      });
-      if (!existingConfig) {
-        this.mergeConfig({
-          type: "options",
-          alias: extendsConfig.filepath,
-          options: extendsConfig.options,
-          dirname: extendsConfig.dirname,
-        });
+        if (value) {
+          buildNestedConfig(value, envKey, rootAlias + ".env." + envKey);
+        }
       }
     }
-  }
-}
 
+    configs.push({
+      type: activeEnvKey ? "options" : rootType,
+      options,
+      dirname,
+      alias: activeAlias,
+      loc: activeAlias,
+      envKey: activeEnvKey,
+    });
+
+    if (rawOpts.extends != null && typeof rawOpts.extends !== "string") {
+      throw new Error(".extends must be a string, null, or undefined");
+    }
+
+    if (rawOpts.extends) {
+      configs.push({
+        type: "extends",
+        extends: rawOpts.extends,
+        dirname,
+      });
+    }
+  })(config.options, undefined, rootAlias);
+
+  return configs;
+}

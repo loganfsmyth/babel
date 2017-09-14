@@ -15,6 +15,8 @@ import fs from "fs";
 import path from "path";
 import vm from "vm";
 
+const PROJECT_PATH = path.resolve(__dirname, "../../..");
+
 const moduleCache = {};
 const testContext = vm.createContext({
   ...helpers,
@@ -139,6 +141,7 @@ function run(task) {
   function getOpts(self) {
     const newOpts = merge(
       {
+        sourceType: path.extname(self.loc) === ".mjs" ? "module" : "script",
         filename: self.loc,
       },
       opts,
@@ -186,6 +189,11 @@ function run(task) {
   const expectCode = expect.code;
   if (!execCode || actualCode) {
     result = babel.transform(actualCode, getOpts(actual));
+
+    const expectExtension =
+      result.ast.program.sourceType === "module" ? ".mjs" : ".js";
+    const expectedFile = expect.loc.replace(/\.m?js/, expectExtension);
+
     if (
       !expect.code &&
       result.code &&
@@ -193,13 +201,31 @@ function run(task) {
       fs.statSync(path.dirname(expect.loc)).isDirectory() &&
       !process.env.CI
     ) {
-      console.log(`New test file created: ${expect.loc}`);
-      fs.writeFileSync(expect.loc, `${result.code}\n`);
+      console.log(
+        `New test file created: ${path.relative(PROJECT_PATH, expectedFile)}`,
+      );
+      fs.writeFileSync(expectedFile, `${result.code}\n`);
     } else {
       actualCode = result.code.trim();
       chai
         .expect(actualCode)
-        .to.be.equal(expectCode, actual.loc + " !== " + expect.loc);
+        .to.be.equal(
+          expectCode,
+          path.relative(PROJECT_PATH, actual.loc) +
+            " !== " +
+            path.relative(PROJECT_PATH, expect.loc),
+        );
+
+      if (result.code) {
+        // If there wasn't code, we don't actually create the file so there
+        // isn't an extension to compare to.
+        chai
+          .expect(path.relative(PROJECT_PATH, expect.loc))
+          .to.be.equal(
+            path.relative(PROJECT_PATH, expectedFile),
+            "Mismatched sourceType, maybe rename your expected.(m)?js",
+          );
+      }
     }
   }
 

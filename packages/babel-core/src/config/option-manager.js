@@ -556,7 +556,7 @@ function chain(a, b) {
 
 function createInitialOptions() {
   return {
-    sourceType: "module",
+    sourceType: "script",
     babelrc: true,
     filename: "unknown",
     code: true,

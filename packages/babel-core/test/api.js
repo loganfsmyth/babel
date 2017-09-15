@@ -18,7 +18,9 @@ function assertNotIgnored(result) {
 function transformAsync(code, opts) {
   return {
     then: function(resolve) {
-      resolve(babel.transform(code, opts));
+      resolve(
+        babel.transform(code, Object.assign({ sourceType: "module" }, opts)),
+      );
     },
   };
 }
@@ -94,6 +96,7 @@ describe("parser and generator options", function() {
     assert.notEqual(
       newTransform(experimental).ast,
       babel.transform(experimental, {
+        sourceType: "module",
         parserOpts: {
           allowImportExportEverywhere: true,
         },
@@ -286,16 +289,7 @@ describe("api", function() {
 
     assert.equal(aliasBaseType, "NumberTypeAnnotation");
 
-    assert.deepEqual(
-      [
-        '"use strict";',
-        "",
-        "var x = function x(y) {",
-        "  return y;",
-        "};",
-      ].join("\n"),
-      result.code,
-    );
+    assert.deepEqual("var x = function x(y) {\n  return y;\n};", result.code);
 
     // 2. passPerPreset: false
 
@@ -305,16 +299,7 @@ describe("api", function() {
 
     assert.equal(aliasBaseType, null);
 
-    assert.deepEqual(
-      [
-        '"use strict";',
-        "",
-        "var x = function x(y) {",
-        "  return y;",
-        "};",
-      ].join("\n"),
-      result.code,
-    );
+    assert.deepEqual("var x = function x(y) {\n  return y;\n};", result.code);
   });
 
   it("complex plugin and preset ordering", function() {

@@ -31,10 +31,12 @@ describe("babel-register", function() {
     const js = require("default-require-extensions/js");
     oldCompiler = require.extensions[".js"];
     require.extensions[".js"] = js;
+    require.extensions[".mjs"] = js;
   });
 
   after(() => {
     require.extensions[".js"] = oldCompiler;
+    require.extensions[".mjs"] = oldCompiler;
   });
 
   afterEach(() => {

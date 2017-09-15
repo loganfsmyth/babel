@@ -1,4 +1,5 @@
 import {
+  isModule,
   rewriteModuleStatementsAndPrepareHeader,
   isSideEffectImport,
   buildNamespaceInitStatements,
@@ -11,6 +12,8 @@ export default function({ types: t }) {
     visitor: {
       Program: {
         exit(path, state) {
+          if (!isModule(path)) return;
+
           const {
             loose,
             allowTopLevelThis,

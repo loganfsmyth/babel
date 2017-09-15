@@ -1,3 +1,4 @@
+import assert from "assert";
 import * as t from "babel-types";
 import template from "babel-template";
 import chunk from "lodash/chunk";
@@ -11,6 +12,16 @@ import normalizeAndLoadModuleMetadata, {
 
 export { hasExports, isSideEffectImport };
 
+export function isModule(path: NodePath) {
+  const { sourceType } = path.node;
+  if (sourceType !== "module" && sourceType !== "script") {
+    throw path.buildCodeFrameError(
+      "Unknown sourceType, cannot transform modules.",
+    );
+  }
+  return path.node.sourceType === "module";
+}
+
 /**
  * Perform all of the generic ES6 module rewriting needed to handle initial
  * module processing. This function will rewrite the majority of the given
@@ -21,6 +32,9 @@ export function rewriteModuleStatementsAndPrepareHeader(
   path: NodePath,
   { exportName, strict, allowTopLevelThis, strictMode, loose, noInterop },
 ) {
+  assert(isModule(path), "Cannot process module statements in a script");
+  path.node.sourceType = "script";
+
   const meta = normalizeAndLoadModuleMetadata(path, exportName, {
     noInterop,
   });

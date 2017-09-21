@@ -1,54 +1,56 @@
 import definitions from "./definitions";
 
+const HELPER_BLACKLIST = ["interopRequireWildcard", "interopRequireDefault"];
+
+function has(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
 export default function({ types: t }) {
-  function getRuntimeModuleName(opts) {
-    return opts.moduleName || "babel-runtime";
-  }
-
-  function has(obj, key) {
-    return Object.prototype.hasOwnProperty.call(obj, key);
-  }
-
-  const HELPER_BLACKLIST = ["interopRequireWildcard", "interopRequireDefault"];
-
   return {
     pre(file) {
-      const moduleName = getRuntimeModuleName(this.opts);
+      const {
+        moduleName,
+        helpers,
+        polyfill,
+        regenerator,
+        useBuiltIns,
+        useESModules,
+      } = this.opts;
 
-      if (this.opts.helpers !== false) {
-        const baseHelpersDir = this.opts.useBuiltIns
-          ? "helpers/builtin"
-          : "helpers";
-        const helpersDir = this.opts.useESModules
-          ? `${baseHelpersDir}/es6`
-          : baseHelpersDir;
-        file.set("helperGenerator", function(name) {
-          if (HELPER_BLACKLIST.indexOf(name) < 0) {
-            return file.addImport(
-              `${moduleName}/${helpersDir}/${name}`,
-              "default",
-              name,
-            );
-          }
-        });
-      }
-
-      if (this.opts.polyfill && this.opts.useBuiltIns) {
+      if (polyfill && useBuiltIns) {
         throw new Error(
           "The polyfill option conflicts with useBuiltIns; use one or the other",
         );
       }
 
-      this.moduleName = moduleName;
+      this.moduleName = moduleName || "babel-runtime";
+      this.referenceCoreJS = polyfill !== false && !useBuiltIns;
+      this.referenceHelpers = helpers !== false;
+      this.referenceRegenerator = regenerator !== false;
+
+      const helpersDir =
+        "helpers" +
+        (this.referenceCoreJS ? "" : "/builtin") +
+        (useESModules ? "/es6" : "");
+
+      if (this.referenceHelpers) {
+        file.set("helperGenerator", name => {
+          if (HELPER_BLACKLIST.indexOf(name) !== -1) return;
+
+          return file.addImport(
+            `${this.moduleName}/${helpersDir}/${name}`,
+            "default",
+            name,
+          );
+        });
+      }
     },
 
     visitor: {
       ReferencedIdentifier(path, state) {
         const { node, parent, scope } = path;
-        if (
-          node.name === "regeneratorRuntime" &&
-          state.opts.regenerator !== false
-        ) {
+        if (node.name === "regeneratorRuntime" && this.referenceRegenerator) {
           path.replaceWith(
             this.file.addImport(
               `${this.moduleName}/regenerator`,
@@ -59,17 +61,16 @@ export default function({ types: t }) {
           return;
         }
 
-        if (state.opts.polyfill === false || state.opts.useBuiltIns) return;
+        if (!this.referenceCoreJS) return;
 
         if (t.isMemberExpression(parent)) return;
         if (!has(definitions.builtins, node.name)) return;
         if (scope.getBindingIdentifier(node.name)) return;
 
         // Symbol() -> _core.Symbol(); new Promise -> new _core.Promise
-        const moduleName = getRuntimeModuleName(state.opts);
         path.replaceWith(
           state.addImport(
-            `${moduleName}/core-js/${definitions.builtins[node.name]}`,
+            `${this.moduleName}/core-js/${definitions.builtins[node.name]}`,
             "default",
             node.name,
           ),
@@ -78,7 +79,7 @@ export default function({ types: t }) {
 
       // arr[Symbol.iterator]() -> _core.$for.getIterator(arr)
       CallExpression(path, state) {
-        if (state.opts.polyfill === false || state.opts.useBuiltIns) return;
+        if (!this.referenceCoreJS) return;
 
         // we can't compile this
         if (path.node.arguments.length) return;
@@ -90,11 +91,10 @@ export default function({ types: t }) {
           return;
         }
 
-        const moduleName = getRuntimeModuleName(state.opts);
         path.replaceWith(
           t.callExpression(
             state.addImport(
-              `${moduleName}/core-js/get-iterator`,
+              `${this.moduleName}/core-js/get-iterator`,
               "default",
               "getIterator",
             ),
@@ -105,16 +105,15 @@ export default function({ types: t }) {
 
       // Symbol.iterator in arr -> core.$for.isIterable(arr)
       BinaryExpression(path, state) {
-        if (state.opts.polyfill === false || state.opts.useBuiltIns) return;
+        if (!this.referenceCoreJS) return;
 
         if (path.node.operator !== "in") return;
         if (!path.get("left").matchesPattern("Symbol.iterator")) return;
 
-        const moduleName = getRuntimeModuleName(state.opts);
         path.replaceWith(
           t.callExpression(
             state.addImport(
-              `${moduleName}/core-js/is-iterable`,
+              `${this.moduleName}/core-js/is-iterable`,
               "default",
               "isIterable",
             ),
@@ -126,7 +125,7 @@ export default function({ types: t }) {
       // Array.from -> _core.Array.from
       MemberExpression: {
         enter(path, state) {
-          if (state.opts.polyfill === false || state.opts.useBuiltIns) return;
+          if (!this.referenceCoreJS) return;
           if (!path.isReferenced()) return;
 
           const { node } = path;
@@ -155,10 +154,9 @@ export default function({ types: t }) {
             }
           }
 
-          const moduleName = getRuntimeModuleName(state.opts);
           path.replaceWith(
             state.addImport(
-              `${moduleName}/core-js/${methods[prop.name]}`,
+              `${this.moduleName}/core-js/${methods[prop.name]}`,
               "default",
               `${obj.name}$${prop.name}`,
             ),
@@ -166,7 +164,7 @@ export default function({ types: t }) {
         },
 
         exit(path, state) {
-          if (state.opts.polyfill === false || state.opts.useBuiltIns) return;
+          if (!this.referenceCoreJS) return;
           if (!path.isReferenced()) return;
 
           const { node } = path;
@@ -175,11 +173,10 @@ export default function({ types: t }) {
           if (!has(definitions.builtins, obj.name)) return;
           if (path.scope.getBindingIdentifier(obj.name)) return;
 
-          const moduleName = getRuntimeModuleName(state.opts);
           path.replaceWith(
             t.memberExpression(
               state.addImport(
-                `${moduleName}/core-js/${definitions.builtins[obj.name]}`,
+                `${this.moduleName}/core-js/${definitions.builtins[obj.name]}`,
                 "default",
                 obj.name,
               ),

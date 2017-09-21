@@ -12,20 +12,19 @@ export default function({ types: t }) {
       const {
         moduleName,
         helpers,
-        polyfill,
         regenerator,
         useBuiltIns,
         useESModules,
       } = this.opts;
 
-      if (polyfill && useBuiltIns) {
+      if (this.opts.polyfill === false) {
         throw new Error(
-          "The polyfill option conflicts with useBuiltIns; use one or the other",
+          "babel-runtime's 'polyfill: false' option has been replaced by 'useBuiltIns: true'.",
         );
       }
 
       this.moduleName = moduleName || "babel-runtime";
-      this.referenceCoreJS = polyfill !== false && !useBuiltIns;
+      this.referenceCoreJS = !useBuiltIns;
       this.referenceHelpers = helpers !== false;
       this.referenceRegenerator = regenerator !== false;
 

@@ -55,7 +55,6 @@ With options:
   "plugins": [
     ["transform-runtime", {
       "helpers": false,
-      "polyfill": false,
       "regenerator": true,
       "moduleName": "babel-runtime"
     }]
@@ -86,14 +85,6 @@ require("babel-core").transform("code", {
 Toggles whether or not inlined Babel helpers (`classCallCheck`, `extends`, etc.) are replaced with calls to `moduleName`.
 
 For more information, see [Helper aliasing](#helper-aliasing).
-
-### `polyfill`
-
-`boolean`, defaults to `true`.
-
-Toggles whether or not new built-ins (`Promise`, `Set`, `Map`, etc.) are transformed to use a non-global polluting polyfill.
-
-For more information, see [`core-js` aliasing](#core-js-aliasing).
 
 ### `regenerator`
 
@@ -126,7 +117,7 @@ import extends from 'flavortown/runtime/helpers/extends';
 `boolean`, defaults to `false`.
 
 When enabled, the transform will use helpers that do not use _any_ polyfills
-from `core-js`.
+from `core-js` and will not rewrite globals to reference core-js.
 
 For example, here is the `instance` helper with `useBuiltIns` disabled:
 

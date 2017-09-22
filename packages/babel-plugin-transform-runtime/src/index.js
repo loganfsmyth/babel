@@ -30,7 +30,7 @@ export default function({ types: t }) {
 
       const helpersDir =
         "helpers" +
-        (this.referenceCoreJS ? "" : "/builtin") +
+        (this.referenceCoreJS ? "/core-js" : "") +
         (useESModules ? "/es6" : "");
 
       if (this.referenceHelpers) {

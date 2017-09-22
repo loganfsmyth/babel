@@ -108,7 +108,7 @@ function buildHelper(helperName, modules, useBuiltIns) {
 
   const transformOpts = makeTransformOpts(modules, useBuiltIns);
 
-  const relative = useBuiltIns ? "../.." : "..";
+  const relative = useBuiltIns ? ".." : "../..";
 
   return babel.transformFromAst(tree, null, {
     presets: transformOpts.presets,
@@ -123,7 +123,7 @@ function buildHelper(helperName, modules, useBuiltIns) {
 
 for (const modules of ["commonjs", false]) {
   for (const builtin of [false, true]) {
-    const dirname = `helpers/${builtin ? "builtin/" : ""}${!modules ? "es6/" : ""}`;
+    const dirname = `helpers/${builtin ? "" : "core-js/"}${!modules ? "es6/" : ""}`;
 
     for (const helperName of helpers.list) {
       writeFile(

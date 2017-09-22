@@ -1,6 +1,6 @@
-import _classCallCheck from "babel-runtime/helpers/builtin/classCallCheck";
-import _possibleConstructorReturn from "babel-runtime/helpers/builtin/possibleConstructorReturn";
-import _inherits from "babel-runtime/helpers/builtin/inherits";
+import _classCallCheck from "babel-runtime/helpers/classCallCheck";
+import _possibleConstructorReturn from "babel-runtime/helpers/possibleConstructorReturn";
+import _inherits from "babel-runtime/helpers/inherits";
 
 let Foo =
 /*#__PURE__*/

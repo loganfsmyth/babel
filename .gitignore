@@ -15,10 +15,10 @@ package-lock.json
 !/packages/babel-runtime/core-js/map.js
 /packages/babel-runtime/helpers/*.js
 !/packages/babel-runtime/helpers/toArray.js
-/packages/babel-runtime/helpers/builtin/*.js
-!/packages/babel-runtime/helpers/builtin/toArray.js
-/packages/babel-runtime/helpers/builtin/es6/*.js
-!/packages/babel-runtime/helpers/builtin/es6/toArray.js
+/packages/babel-runtime/helpers/core-js/*.js
+!/packages/babel-runtime/helpers/core-js/toArray.js
+/packages/babel-runtime/helpers/core-js/es6/*.js
+!/packages/babel-runtime/helpers/core-js/es6/toArray.js
 /packages/babel-runtime/helpers/es6/*.js
 !/packages/babel-runtime/helpers/es6/toArray.js
 /packages/babel-register/test/.babel

@@ -1,7 +1,7 @@
 import _Object$getPrototypeOf from "babel-runtime/core-js/object/get-prototype-of";
-import _classCallCheck from "babel-runtime/helpers/es6/classCallCheck";
-import _possibleConstructorReturn from "babel-runtime/helpers/es6/possibleConstructorReturn";
-import _inherits from "babel-runtime/helpers/es6/inherits";
+import _classCallCheck from "babel-runtime/helpers/core-js/es6/classCallCheck";
+import _possibleConstructorReturn from "babel-runtime/helpers/core-js/es6/possibleConstructorReturn";
+import _inherits from "babel-runtime/helpers/core-js/es6/inherits";
 
 let Foo =
 /*#__PURE__*/

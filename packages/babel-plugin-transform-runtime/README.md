@@ -12,7 +12,7 @@ This is where the `transform-runtime` plugin comes in: all of the helpers will r
 
 Another purpose of this transformer is to create a sandboxed environment for your code. If you use [babel-polyfill](http://babeljs.io/docs/usage/polyfill/) and the built-ins it provides such as `Promise`, `Set` and `Map`, those will pollute the global scope. While this might be ok for an app or a command line tool, it becomes a problem if your code is a library which you intend to publish for others to use or if you can't exactly control the environment in which your code will run.
 
-With the `useCoreJS: true` option, this transformer will alias these built-ins to `core-js` so you can use them seamlessly without having to require the polyfill.
+With the `useCoreJS: true` option, this transformer will alias these built-ins to `core-js` so you can use them seamlessly without having to require the polyfill manually.
 
 See the [technical details](#technical-details) section for more information on how this works and the types of transformations that occur.
 
@@ -30,6 +30,9 @@ and `babel-runtime` as a production dependency (with `--save`).
 
 ```sh
 npm install --save babel-runtime
+
+# If you want to use 'useCoreJS: true'.
+npm install --save core-js
 ```
 
 The transformation plugin is typically used only in development, but the runtime itself will be depended on by your deployed/published code. See the examples below for more details.
@@ -117,18 +120,22 @@ import extends from 'flavortown/runtime/helpers/extends';
 `boolean`, defaults to `false`.
 
 When enabled, the transform will use helpers that use the `core-js` polyfill
-and will rewrite globals to reference core-js.
+and will rewrite globals to reference core-js. Users will also need to
+
+```sh
+npm install --save core-js
+```
 
 For example, here is the `instance` helper with `useCoreJS` disabled:
 
 ```js
 exports.__esModule = true;
 
-var _hasInstance = require("../core-js/symbol/has-instance");
+var _hasInstance = require("core-js/symbol/has-instance");
 
 var _hasInstance2 = _interopRequireDefault(_hasInstance);
 
-var _symbol = require("../core-js/symbol");
+var _symbol = require("core-js/symbol");
 
 var _symbol2 = _interopRequireDefault(_symbol);
 
@@ -192,7 +199,7 @@ export default function (instance, Constructor) {
 The `runtime` transformer plugin does three things:
 
 * Automatically requires `babel-runtime/regenerator` when you use generators/async functions.
-* Automatically requires `babel-runtime/core-js` and maps ES6 static methods and built-ins.
+* Automatically requires `core-js` and maps ES6 static methods and built-ins, when `useCoreJS: true` is enabled.
 * Removes the inline Babel helpers and uses the module `babel-runtime/helpers` instead.
 
 What does this actually mean though? Basically, you can use built-ins such as `Promise`, `Set`, `Symbol`, etc., as well use all the Babel features that require a polyfill seamlessly, without global pollution, making it extremely suitable for libraries.
@@ -280,15 +287,15 @@ into the following:
 ```javascript
 "use strict";
 
-var _getIterator2 = require("babel-runtime/core-js/get-iterator");
+var _getIterator2 = require("core-js/get-iterator");
 
 var _getIterator3 = _interopRequireDefault(_getIterator2);
 
-var _promise = require("babel-runtime/core-js/promise");
+var _promise = require("core-js/promise");
 
 var _promise2 = _interopRequireDefault(_promise);
 
-var _symbol = require("babel-runtime/core-js/symbol");
+var _symbol = require("core-js/symbol");
 
 var _symbol2 = _interopRequireDefault(_symbol);
 

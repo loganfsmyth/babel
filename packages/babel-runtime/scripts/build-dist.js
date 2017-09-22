@@ -1,32 +1,11 @@
 "use strict";
 
 const outputFile = require("output-file-sync");
-const coreDefinitions = require("babel-plugin-transform-runtime").definitions;
 const helpers = require("babel-helpers");
 const babel = require("../../babel-core");
 const t = require("../../babel-types");
 
 const paths = ["is-iterable", "get-iterator"];
-
-Object.keys(coreDefinitions.builtins).forEach((key) => {
-  const path = coreDefinitions.builtins[key];
-  paths.push(path);
-});
-
-Object.keys(coreDefinitions.methods).forEach((key) => {
-  const props = coreDefinitions.methods[key];
-  Object.keys(props).forEach((key2) => {
-    const path = props[key2];
-    paths.push(path);
-  });
-});
-
-paths.forEach(function(path) {
-  writeFile(
-    "core-js/" + path + ".js",
-    defaultify(`require("core-js/library/fn/${path}")`)
-  );
-});
 
 function relative(filename) {
   return `${__dirname}/../${filename}`;

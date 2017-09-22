@@ -1,5 +1,5 @@
 import _regeneratorRuntime from "foo/regenerator";
-import _Symbol from "foo/core-js/symbol";
+import _Symbol from "core-js/symbol";
 
 var _marked =
 /*#__PURE__*/

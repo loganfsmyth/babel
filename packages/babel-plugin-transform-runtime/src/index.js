@@ -74,7 +74,7 @@ export default function({ types: t }) {
         // Symbol() -> _core.Symbol(); new Promise -> new _core.Promise
         path.replaceWith(
           state.addImport(
-            `${this.moduleName}/core-js/${definitions.builtins[node.name]}`,
+            `core-js/${definitions.builtins[node.name]}`,
             "default",
             node.name,
           ),
@@ -97,11 +97,7 @@ export default function({ types: t }) {
 
         path.replaceWith(
           t.callExpression(
-            state.addImport(
-              `${this.moduleName}/core-js/get-iterator`,
-              "default",
-              "getIterator",
-            ),
+            state.addImport("core-js/get-iterator", "default", "getIterator"),
             [callee.object],
           ),
         );
@@ -116,11 +112,7 @@ export default function({ types: t }) {
 
         path.replaceWith(
           t.callExpression(
-            state.addImport(
-              `${this.moduleName}/core-js/is-iterable`,
-              "default",
-              "isIterable",
-            ),
+            state.addImport("core-js/is-iterable", "default", "isIterable"),
             [path.node.right],
           ),
         );
@@ -160,7 +152,7 @@ export default function({ types: t }) {
 
           path.replaceWith(
             state.addImport(
-              `${this.moduleName}/core-js/${methods[prop.name]}`,
+              `core-js/${methods[prop.name]}`,
               "default",
               `${obj.name}$${prop.name}`,
             ),
@@ -180,7 +172,7 @@ export default function({ types: t }) {
           path.replaceWith(
             t.memberExpression(
               state.addImport(
-                `${this.moduleName}/core-js/${definitions.builtins[obj.name]}`,
+                `core-js/${definitions.builtins[obj.name]}`,
                 "default",
                 obj.name,
               ),

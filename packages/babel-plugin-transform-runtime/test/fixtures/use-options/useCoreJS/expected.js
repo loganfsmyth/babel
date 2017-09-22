@@ -1,4 +1,4 @@
-import _Object$getPrototypeOf from "babel-runtime/core-js/object/get-prototype-of";
+import _Object$getPrototypeOf from "core-js/object/get-prototype-of";
 import _classCallCheck from "babel-runtime/helpers/core-js/classCallCheck";
 import _possibleConstructorReturn from "babel-runtime/helpers/core-js/possibleConstructorReturn";
 import _inherits from "babel-runtime/helpers/core-js/inherits";

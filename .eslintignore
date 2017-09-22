@@ -1,7 +1,6 @@
 /lib
 packages/babel-runtime
 !packages/babel-runtime/scripts
-!packages/babel-runtime/core-js.js
 packages/*/node_modules
 packages/*/lib
 packages/*/dist

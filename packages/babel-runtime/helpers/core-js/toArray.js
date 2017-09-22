@@ -1,7 +1,7 @@
 exports.__esModule = true;
 exports.default = _toArray;
 
-var _from = _interopRequireDefault(require("../../core-js/array/from"));
+var _from = _interopRequireDefault(require("core-js/array/from"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 

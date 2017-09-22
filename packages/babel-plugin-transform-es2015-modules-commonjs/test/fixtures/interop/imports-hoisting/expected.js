@@ -1,6 +1,6 @@
 "use strict";
 
-var _taggedTemplateLiteral2 = _interopRequireDefault(require("babel-runtime/helpers/core-js/taggedTemplateLiteral"));
+var _taggedTemplateLiteral2 = _interopRequireDefault(require("babel-runtime/helpers/taggedTemplateLiteral"));
 
 var _templateObject = (0, _taggedTemplateLiteral2.default)(["foo"], ["foo"]);
 

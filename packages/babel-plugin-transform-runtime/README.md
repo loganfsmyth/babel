@@ -1,6 +1,6 @@
 # babel-plugin-transform-runtime
 
-> Externalise references to helpers and built-ins, automatically polyfilling your code without polluting globals. (This plugin is recommended in a library/tool)
+> Externalise references to helpers, and optionally automatically polyfilling your code without polluting globals. (This plugin is recommended in a library/tool with `useCoreJS: true` enabled)
 
 NOTE: Instance methods such as `"foobar".includes("foo")` will not work since that would require modification of existing built-ins (Use [`babel-polyfill`](http://babeljs.io/docs/usage/polyfill) for that).
 
@@ -12,7 +12,7 @@ This is where the `transform-runtime` plugin comes in: all of the helpers will r
 
 Another purpose of this transformer is to create a sandboxed environment for your code. If you use [babel-polyfill](http://babeljs.io/docs/usage/polyfill/) and the built-ins it provides such as `Promise`, `Set` and `Map`, those will pollute the global scope. While this might be ok for an app or a command line tool, it becomes a problem if your code is a library which you intend to publish for others to use or if you can't exactly control the environment in which your code will run.
 
-The transformer will alias these built-ins to `core-js` so you can use them seamlessly without having to require the polyfill.
+With the `useCoreJS: true` option, this transformer will alias these built-ins to `core-js` so you can use them seamlessly without having to require the polyfill.
 
 See the [technical details](#technical-details) section for more information on how this works and the types of transformations that occur.
 
@@ -112,14 +112,14 @@ Example:
 import extends from 'flavortown/runtime/helpers/extends';
 ```
 
-### `useBuiltIns`
+### `useCoreJS`
 
 `boolean`, defaults to `false`.
 
-When enabled, the transform will use helpers that do not use _any_ polyfills
-from `core-js` and will not rewrite globals to reference core-js.
+When enabled, the transform will use helpers that use the `core-js` polyfill
+and will rewrite globals to reference core-js.
 
-For example, here is the `instance` helper with `useBuiltIns` disabled:
+For example, here is the `instance` helper with `useCoreJS` disabled:
 
 ```js
 exports.__esModule = true;

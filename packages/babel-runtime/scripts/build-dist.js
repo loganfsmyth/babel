@@ -46,14 +46,14 @@ function writeFile(filename, content) {
   return writeRootFile(filename, content);
 }
 
-function makeTransformOpts(modules, useBuiltIns) {
+function makeTransformOpts(modules, useCoreJS) {
   const opts = {
     presets: [[require("../../babel-preset-es2015"), { modules: false }]],
 
     plugins: [
       [
         require("../../babel-plugin-transform-runtime"),
-        { useBuiltIns, useESModules: modules === false },
+        { useCoreJS, useESModules: modules === false },
       ],
     ],
   };
@@ -103,12 +103,12 @@ function buildRuntimeRewritePlugin(relativePath, helperName) {
   };
 }
 
-function buildHelper(helperName, modules, useBuiltIns) {
+function buildHelper(helperName, modules, useCoreJS) {
   const tree = t.program(helpers.get(helperName).nodes);
 
-  const transformOpts = makeTransformOpts(modules, useBuiltIns);
+  const transformOpts = makeTransformOpts(modules, useCoreJS);
 
-  const relative = useBuiltIns ? ".." : "../..";
+  const relative = useCoreJS ? "../.." : "..";
 
   return babel.transformFromAst(tree, null, {
     presets: transformOpts.presets,
@@ -122,13 +122,13 @@ function buildHelper(helperName, modules, useBuiltIns) {
 }
 
 for (const modules of ["commonjs", false]) {
-  for (const builtin of [false, true]) {
-    const dirname = `helpers/${builtin ? "" : "core-js/"}${!modules ? "es6/" : ""}`;
+  for (const useCoreJS of [false, true]) {
+    const dirname = `helpers/${useCoreJS ? "core-js/" : ""}${!modules ? "es6/" : ""}`;
 
     for (const helperName of helpers.list) {
       writeFile(
         `${dirname}${helperName}.js`,
-        buildHelper(helperName, modules, builtin)
+        buildHelper(helperName, modules, useCoreJS)
       );
     }
   }

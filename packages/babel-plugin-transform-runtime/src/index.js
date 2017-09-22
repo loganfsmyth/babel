@@ -13,7 +13,7 @@ export default function({ types: t }) {
         moduleName,
         helpers,
         regenerator,
-        useBuiltIns,
+        useCoreJS,
         useESModules,
       } = this.opts;
 
@@ -22,9 +22,14 @@ export default function({ types: t }) {
           "babel-runtime's 'polyfill: false' option has been replaced by 'useBuiltIns: true'.",
         );
       }
+      if (this.opts.useBuiltIns) {
+        throw new Error(
+          "babel-runtime's 'useBuiltIns: true' option is now the default. The option should be removed.",
+        );
+      }
 
       this.moduleName = moduleName || "babel-runtime";
-      this.referenceCoreJS = !useBuiltIns;
+      this.referenceCoreJS = useCoreJS === true;
       this.referenceHelpers = helpers !== false;
       this.referenceRegenerator = regenerator !== false;
 

@@ -1,0 +1,3 @@
+{
+  "plugins": [["transform-runtime", {"useCoreJS": true}], "transform-es2015-classes"]
+}

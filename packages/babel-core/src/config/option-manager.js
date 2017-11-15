@@ -10,6 +10,8 @@ import { makeWeakCache, type CacheConfigurator } from "./caching";
 import { getEnv } from "./helpers/environment";
 import { validate, type ValidatedOptions, type PluginItem } from "./options";
 
+import makeAPI from "./helpers/config-api";
+
 import { loadPlugin, loadPreset } from "./loading/files";
 
 type MergeOptions =
@@ -193,11 +195,7 @@ const loadDescriptor = makeWeakCache(
   ): LoadedDescriptor => {
     let item = value;
     if (typeof value === "function") {
-      const api = Object.assign(Object.create(context), {
-        cache: cache.simple(),
-        env: () => cache.using(data => data.envName),
-        async: () => false,
-      });
+      const api = Object.assign(Object.create(context), makeAPI(cache));
 
       try {
         item = value(api, options, dirname);

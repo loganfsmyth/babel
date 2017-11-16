@@ -280,6 +280,9 @@ const instantiatePlugin = makeWeakCache(
     if (plugin.visitor) {
       plugin.visitor = traverse.explode(clone(plugin.visitor));
     }
+    if (plugin.cached) {
+      plugin.cached = clone(plugin.cached);
+    }
     if (plugin.cacheKey === undefined) {
       plugin.cacheKey = buildCacheKey.error(
         `No cache key given by plugin ${alias}. ` +
@@ -314,6 +317,12 @@ const instantiatePlugin = makeWeakCache(
         inherits.visitor || {},
         plugin.visitor || {},
       ]);
+      Object.keys(plugin.cached || {}).forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(inherits.cached, key)) {
+          throw new Error("Cannot use same 'cached' key as parent plugin");
+        }
+      });
+      plugin.cached = Object.assign({}, inherits.cached, plugin.cached);
     }
 
     return new Plugin(plugin, options, alias);

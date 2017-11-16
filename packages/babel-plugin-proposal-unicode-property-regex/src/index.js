@@ -11,16 +11,24 @@ export default function(api, options) {
 
   return {
     cacheKey: CACHE_KEY,
+    cached: {
+      // Use a cached wrapper because it is possible that 'regexpu-core' will
+      // have changed versions between Babel executions, and CACHE_KEY has
+      // no way to take that into account.
+      rewritePattern(pattern, flags) {
+        return rewritePattern(pattern, flags, {
+          unicodePropertyEscape: true,
+          useUnicodeFlag,
+        });
+      },
+    },
     visitor: {
       RegExpLiteral(path) {
         const node = path.node;
         if (!regex.is(node, "u")) {
           return;
         }
-        node.pattern = rewritePattern(node.pattern, node.flags, {
-          unicodePropertyEscape: true,
-          useUnicodeFlag,
-        });
+        node.pattern = this.cached.rewritePattern(node.pattern, node.flags);
         if (!useUnicodeFlag) {
           regex.pullFlag(node, "u");
         }

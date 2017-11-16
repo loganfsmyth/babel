@@ -2,6 +2,9 @@
 import traverse from "@babel/traverse";
 import type { SourceMap } from "convert-source-map";
 
+import isPlainObject from "lodash/isPlainObject";
+import isEqual from "lodash/isEqual";
+import buildDebug from "debug";
 import buildCacheKey from "@babel/helper-caching";
 
 import type { ResolvedConfig, PluginPasses } from "../config";
@@ -15,6 +18,8 @@ import normalizeFile from "./normalize-file";
 
 import generateCode from "./file/generate";
 import type File from "./file/file";
+
+const debug = buildDebug("babel:transformation:index");
 
 export type FileResultCallback = {
   (Error, null): any,
@@ -31,7 +36,16 @@ export type FileResult = {
 
 type CacheItem = {
   result: FileResult,
+  checks: PassesChecks,
 };
+type PassesChecks = Array<Array<CachePluginChecks>>;
+type CachePluginChecks = Array<CacheCheck>;
+type CacheCheck = {
+  name: string,
+  args: Array<mixed>,
+  result: mixed,
+};
+
 function loadFromCache(
   passes: PluginPasses,
   key: string,
@@ -76,6 +90,32 @@ function hasCachePlugins(passes: PluginPasses) {
   return false;
 }
 
+function runCacheChecks(
+  passes: PluginPasses,
+  passesChecks: PassesChecks,
+): boolean {
+  return passesChecks.every((passChecks, passIndex) => {
+    const pass = passes[passIndex];
+
+    return passChecks.every((pluginChecks, pluginIndex) => {
+      const plugin = pass && pass[pluginIndex];
+
+      return pluginChecks.every(({ name, args, result }) => {
+        if (!plugin || !plugin.cached || !plugin.cached[name]) {
+          debug(
+            `Corrupt cache entry detected for pass ${passIndex} at index ${pluginIndex} with name ${name}`,
+          );
+          return false;
+        }
+        const handler = plugin.cached[name];
+        const value = handler.apply(undefined, args);
+
+        return isEqual(value, result);
+      });
+    });
+  });
+}
+
 export function runAsync(
   config: ResolvedConfig,
   code: string,
@@ -117,6 +157,11 @@ export function runSync(
       ? null
       : loadFromCache(config.passes, cacheKey, config.options.filename);
 
+  // Allow plugins to expose functions that are re-called with the cache
+  // value. If a plugin returns a different value at a later time, the cache
+  // entry is considered invalidated.
+  if (cached && !runCacheChecks(config.passes, cached.checks)) cached = null;
+
   let result;
   if (cached) {
     result = cached.result;
@@ -153,18 +198,22 @@ export function runSync(
   return result;
 }
 
-function transformFile(file: File, pluginPasses: PluginPasses): void {
-  for (const pluginPairs of pluginPasses) {
+function transformFile(file: File, pluginPasses: PluginPasses): PassesChecks {
+  return pluginPasses.map(pluginPairs => {
     const passPairs = [];
     const passes = [];
     const visitors = [];
+    const passChecks = [];
 
     for (const plugin of pluginPairs.concat([loadBlockHoistPlugin()])) {
-      const pass = new PluginPass(file, plugin.key, plugin.options);
+      const { cached, checks } = buildCachedWrappers(plugin.cached);
+
+      const pass = new PluginPass(file, plugin.key, plugin.options, cached);
 
       passPairs.push([plugin, pass]);
       passes.push(pass);
       visitors.push(plugin.visitor);
+      passChecks.push(checks);
     }
 
     for (const [plugin, pass] of passPairs) {
@@ -206,7 +255,62 @@ function transformFile(file: File, pluginPasses: PluginPasses): void {
         }
       }
     }
+
+    return passChecks;
+  });
+}
+
+function buildCachedWrappers<T: {}>(
+  cachedToWrapIn: T | void,
+): { cached: T | void, checks: CachePluginChecks } {
+  if (cachedToWrapIn === undefined) return { cached: undefined, checks: [] };
+  const cachedToWrap = cachedToWrapIn;
+
+  const checks = [];
+  const cached = Object.keys(cachedToWrap).reduce((acc, name) => {
+    const fn = cachedToWrap[name];
+    if (typeof fn !== "function") {
+      throw new Error("");
+    }
+
+    acc[name] = (...args) => {
+      if (!args.every(arg => isJSONValue(arg))) {
+        throw new Error(
+          `.cached[...] functions must have JSON-stringifiable arguments.`,
+        );
+      }
+
+      const result = fn(...args);
+
+      if (!isJSONValue(result)) {
+        throw new Error(
+          `.cached[...] functions must have JSON-stringifiable return values.`,
+        );
+      }
+
+      checks.push({ name, args, result });
+
+      return result;
+    };
+    return acc;
+  }, (({}: any): T));
+
+  return { cached, checks };
+}
+function isJSONValue(value: mixed): boolean {
+  if (isPlainObject(value)) {
+    const obj: {} = (value: any);
+    return Object.keys(obj).every(key => isJSONValue(obj[key]));
+  } else if (Array.isArray(value)) {
+    return value.every(item => isJSONValue(item));
   }
+
+  return (
+    value === null ||
+    (typeof value === "number" && isFinite(value)) ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  );
 }
 
 function isThenable(val: mixed): boolean {

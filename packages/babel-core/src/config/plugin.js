@@ -38,6 +38,8 @@ const VALIDATORS: ValidatorSet = {
   cacheKey: (assertCacheKey: Validator<
     $PropertyType<PluginObject, "cacheKey">,
   >),
+
+  cached: (assertObject: Validator<$PropertyType<PluginObject, "cached">>),
   loadFromCache: (assertFunction: Validator<
     $PropertyType<PluginObject, "loadFromCache">,
   >),
@@ -99,6 +101,8 @@ export type PluginObject = {
   parserOverride?: Function,
   generatorOverride?: Function,
 
+  cached?: {},
+
   loadFromCache?: Function,
   saveToCache?: Function,
 };
@@ -124,6 +128,8 @@ export default class Plugin {
   parserOverride: Function | void;
   generatorOverride: Function | void;
 
+  cached: {} | void;
+
   loadFromCache: Function | void;
   saveToCache: Function | void;
 
@@ -140,6 +146,7 @@ export default class Plugin {
     this.visitor = plugin.visitor || {};
     this.parserOverride = plugin.parserOverride;
     this.generatorOverride = plugin.generatorOverride;
+    this.cached = plugin.cached;
     this.loadFromCache = plugin.loadFromCache;
     this.saveToCache = plugin.saveToCache;
 

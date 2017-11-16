@@ -8,12 +8,16 @@ import resolve from "resolve";
 import { makeStrongCache, type CacheConfigurator } from "../../caching";
 import makeAPI from "../../helpers/config-api";
 
+import buildCacheKey, { type CacheKey } from "@babel/helper-caching";
+
 const debug = buildDebug("babel:config:loading:files:configuration");
 
 export type ConfigFile = {
   filepath: string,
   dirname: string,
   options: {},
+  inputKey: CacheKey,
+  cacheKey: CacheKey | void,
 };
 
 const BABELRC_FILENAME = ".babelrc";
@@ -109,7 +113,10 @@ function readConfig(filepath, envName) {
 const LOADING_CONFIGS = new Set();
 
 const readConfigJS = makeStrongCache(
-  (filepath, cache: CacheConfigurator<{ envName: string }>) => {
+  (
+    filepath,
+    cache: CacheConfigurator<{ envName: string }>,
+  ): ConfigFile | null => {
     if (!fs.existsSync(filepath)) {
       cache.forever();
       return null;
@@ -126,6 +133,8 @@ const readConfigJS = makeStrongCache(
         filepath,
         dirname: path.dirname(filepath),
         options: {},
+        inputKey: "",
+        cacheKey: "{}",
       };
     }
 
@@ -172,44 +181,51 @@ const readConfigJS = makeStrongCache(
       filepath,
       dirname: path.dirname(filepath),
       options,
+      // `makeAPI` confirms that values are cacheable keys, so we just cast.
+      inputKey: buildCacheKey.obj(((cache.pairs(): any): Array<CacheKey>)),
+      cacheKey: undefined,
     };
   },
 );
 
-const readConfigFile = makeStaticFileCache((filepath, content) => {
-  let options;
-  if (path.basename(filepath) === PACKAGE_FILENAME) {
-    try {
-      options = JSON.parse(content).babel;
-    } catch (err) {
-      err.message = `${filepath}: Error while parsing JSON - ${err.message}`;
-      throw err;
+const readConfigFile = makeStaticFileCache(
+  (filepath, content): ConfigFile | null => {
+    let options;
+    if (path.basename(filepath) === PACKAGE_FILENAME) {
+      try {
+        options = JSON.parse(content).babel;
+      } catch (err) {
+        err.message = `${filepath}: Error while parsing JSON - ${err.message}`;
+        throw err;
+      }
+      if (!options) return null;
+    } else {
+      try {
+        options = json5.parse(content);
+      } catch (err) {
+        err.message = `${filepath}: Error while parsing config - ${err.message}`;
+        throw err;
+      }
+
+      if (!options) throw new Error(`${filepath}: No config detected`);
     }
-    if (!options) return null;
-  } else {
-    try {
-      options = json5.parse(content);
-    } catch (err) {
-      err.message = `${filepath}: Error while parsing config - ${err.message}`;
-      throw err;
+
+    if (typeof options !== "object") {
+      throw new Error(`${filepath}: Config returned typeof ${typeof options}`);
+    }
+    if (Array.isArray(options)) {
+      throw new Error(`${filepath}: Expected config object but found array`);
     }
 
-    if (!options) throw new Error(`${filepath}: No config detected`);
-  }
-
-  if (typeof options !== "object") {
-    throw new Error(`${filepath}: Config returned typeof ${typeof options}`);
-  }
-  if (Array.isArray(options)) {
-    throw new Error(`${filepath}: Expected config object but found array`);
-  }
-
-  return {
-    filepath,
-    dirname: path.dirname(filepath),
-    options,
-  };
-});
+    return {
+      filepath,
+      dirname: path.dirname(filepath),
+      options,
+      inputKey: "",
+      cacheKey: buildCacheKey(content),
+    };
+  },
+);
 
 const readIgnoreConfig = makeStaticFileCache((filepath, content) => {
   const ignore = content
@@ -221,6 +237,8 @@ const readIgnoreConfig = makeStaticFileCache((filepath, content) => {
     filepath,
     dirname: path.dirname(filepath),
     options: { ignore },
+    inputKey: "",
+    cacheKey: buildCacheKey(content),
   };
 });
 

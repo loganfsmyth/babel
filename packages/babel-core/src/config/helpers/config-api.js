@@ -86,7 +86,7 @@ function makeSimpleConfigurator(
 function assertValidKey(key: mixed): void {
   if (!validKey(key)) {
     throw new Error(
-      `Values must be non-undefined primitives, or have meaningful toString implementations for caching`,
+      `Values must be primitives, or have meaningful toString implementations for caching`,
     );
   }
 }

@@ -1,9 +1,13 @@
 // @flow
 
+import type { CacheKey } from "@babel/helper-caching";
+
 export type ConfigFile = {
   filepath: string,
   dirname: string,
   options: {},
+  inputKey: CacheKey,
+  cacheKey: CacheKey | void,
 };
 
 // eslint-disable-next-line no-unused-vars

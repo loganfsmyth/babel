@@ -3,6 +3,9 @@
 import path from "path";
 import micromatch from "micromatch";
 import buildDebug from "debug";
+import buildCacheKey, { type CacheKey } from "@babel/helper-caching";
+import { buildOptionsCacheKey } from "./options-cache-key";
+
 import {
   validate,
   type ValidatedOptions,
@@ -21,6 +24,7 @@ export type ConfigItem = {
   options: ValidatedOptions,
   alias: string,
   dirname: string,
+  cacheKey: CacheKey,
 };
 
 type ConfigPart =
@@ -142,9 +146,14 @@ function flattenArgumentsOptionsParts(
     ...options
   } = opts;
 
+  // Not included above because we want to leave a valid 'cacheKey' on 'options'.
+  const cacheKey = opts.cacheKey;
+
   const raw = [];
   if (env) {
-    raw.push(...flattenArgumentsEnvOptionsParts(env)(dirname)(envName));
+    raw.push(
+      ...flattenArgumentsEnvOptionsParts(env)(dirname)(cacheKey)(envName),
+    );
   }
 
   if (Object.keys(options).length > 0) {
@@ -152,18 +161,22 @@ function flattenArgumentsOptionsParts(
   }
 
   if (plugins) {
-    raw.push(...flattenArgumentsPluginsOptionsParts(plugins)(dirname));
+    raw.push(
+      ...flattenArgumentsPluginsOptionsParts(plugins)(dirname)(cacheKey),
+    );
   }
   if (presets) {
     raw.push(
-      ...flattenArgumentsPresetsOptionsParts(presets)(!!passPerPreset)(dirname),
+      ...flattenArgumentsPresetsOptionsParts(presets)(!!passPerPreset)(dirname)(
+        cacheKey,
+      ),
     );
   }
 
   if (extendsPath != null) {
     raw.push(
       ...flattenOptionsParts(
-        buildArgumentsItem({ extends: extendsPath }, dirname),
+        buildArgumentsItem({ cacheKey, extends: extendsPath }, dirname),
       ),
     );
   }
@@ -176,10 +189,10 @@ function flattenArgumentsOptionsParts(
  * the object identity of the 'env' object.
  */
 const flattenArgumentsEnvOptionsParts = makeWeakCache((env: {}) => {
-  const options: ValidatedOptions = { env };
-
   return makeStrongCache((dirname: string) =>
-    flattenOptionsPartsLookup(buildArgumentsItem(options, dirname)),
+    makeStrongCache((cacheKey: CacheKey) =>
+      flattenOptionsPartsLookup(buildArgumentsItem({ cacheKey, env }, dirname)),
+    ),
   );
 });
 
@@ -189,10 +202,10 @@ const flattenArgumentsEnvOptionsParts = makeWeakCache((env: {}) => {
  */
 const flattenArgumentsPluginsOptionsParts = makeWeakCache(
   (plugins: PluginList) => {
-    const options: ValidatedOptions = { plugins };
-
     return makeStrongCache((dirname: string) =>
-      flattenOptionsParts(buildArgumentsItem(options, dirname)),
+      makeStrongCache((cacheKey: CacheKey) =>
+        flattenOptionsParts(buildArgumentsItem({ cacheKey, plugins }, dirname)),
+      ),
     );
   },
 );
@@ -204,13 +217,12 @@ const flattenArgumentsPluginsOptionsParts = makeWeakCache(
 const flattenArgumentsPresetsOptionsParts = makeWeakCache(
   (presets: PluginList) =>
     makeStrongCache((passPerPreset: boolean) => {
-      // The concept of passPerPreset is integrally tied to the preset list
-      // so unfortunately we need to copy both values here, adding an extra
-      // layer of caching functions.
-      const options = { presets, passPerPreset };
-
       return makeStrongCache((dirname: string) =>
-        flattenOptionsParts(buildArgumentsItem(options, dirname)),
+        makeStrongCache((cacheKey: CacheKey) =>
+          flattenOptionsParts(
+            buildArgumentsItem({ cacheKey, presets, passPerPreset }, dirname),
+          ),
+        ),
       );
     }),
 );
@@ -224,6 +236,7 @@ function buildArgumentsItem(
     options,
     alias: "base",
     dirname,
+    cacheKey: buildOptionsCacheKey(options),
   };
 }
 
@@ -233,11 +246,17 @@ function buildArgumentsItem(
  * with caching later in config processing.
  */
 const flattenFileOptionsParts = makeWeakCache((file: ConfigFile) => {
+  const options = validate("file", file.options);
+
   return flattenOptionsPartsLookup({
     type: "file",
-    options: validate("file", file.options),
+    options,
     alias: file.filepath,
     dirname: file.dirname,
+    cacheKey:
+      file.cacheKey === undefined
+        ? buildCacheKey(file.inputKey, buildOptionsCacheKey(options))
+        : file.cacheKey,
   });
 });
 
@@ -276,7 +295,7 @@ function flattenOptionsParts(
   config: ConfigItem,
   activeEnv: string | null = null,
 ): Array<ConfigPart> {
-  const { options: rawOpts, alias, dirname } = config;
+  const { options: rawOpts, alias, dirname, cacheKey } = config;
 
   const parts = [];
 
@@ -290,6 +309,7 @@ function flattenOptionsParts(
               options: rawOpts.env[envKey],
               alias: alias + `.env.${envKey}`,
               dirname,
+              cacheKey: buildCacheKey(cacheKey, "env", envKey),
             },
             envKey,
           ),

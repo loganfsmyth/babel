@@ -1,4 +1,5 @@
 // @flow
+import buildCacheKey, { type CacheKey } from "@babel/helper-caching";
 
 import * as context from "../index";
 import Plugin, { validatePluginObject } from "./plugin";
@@ -9,6 +10,7 @@ import clone from "lodash/clone";
 import { makeWeakCache, type CacheConfigurator } from "./caching";
 import { getEnv } from "./helpers/environment";
 import { validate, type ValidatedOptions, type PluginItem } from "./options";
+import { buildOptionsCacheKey } from "./options-cache-key";
 
 import makeAPI from "./helpers/config-api";
 
@@ -21,23 +23,21 @@ type MergeOptions =
       options: ValidatedOptions,
       alias: string,
       dirname: string,
+      cacheKey: CacheKey,
     };
 
 export default function manageOptions(opts: {}): {
   options: Object,
   passes: Array<Array<Plugin>>,
+  cacheKey: CacheKey,
 } | null {
   return new OptionManager().init(opts);
 }
 
 class OptionManager {
-  constructor() {
-    this.options = {};
-    this.passes = [[]];
-  }
-
-  options: ValidatedOptions;
-  passes: Array<Array<Plugin>>;
+  keys: Array<CacheKey> = [];
+  options: ValidatedOptions = {};
+  passes: Array<Array<Plugin>> = [[]];
 
   /**
    * This is called when we want to merge the input `opts` into the
@@ -100,6 +100,7 @@ class OptionManager {
     }
 
     merge(this.options, options);
+    this.keys.push(config.cacheKey);
   }
 
   init(inputOpts: {}) {
@@ -124,23 +125,30 @@ class OptionManager {
       throw e;
     }
 
-    const opts: Object = this.options;
+    const { options, passes, keys } = this;
+
+    const cacheKey = buildCacheKey(
+      buildCacheKey.obj(keys),
+      buildCacheKey.obj(
+        passes.map(plugins =>
+          buildCacheKey.obj(plugins.map(plugin => plugin.cacheKey)),
+        ),
+      ),
+    );
 
     // Tack the passes onto the object itself so that, if this object is passed back to Babel a second time,
     // it will be in the right structure to not change behavior.
-    opts.babelrc = false;
-    opts.plugins = this.passes[0];
-    opts.presets = this.passes
+    options.babelrc = false;
+    options.plugins = this.passes[0];
+    options.presets = this.passes
       .slice(1)
       .filter(plugins => plugins.length > 0)
       .map(plugins => ({ plugins }));
-    opts.passPerPreset = opts.presets.length > 0;
-    opts.envName = envName;
+    options.passPerPreset = options.presets.length > 0;
+    options.envName = envName;
+    options.cacheKey = cacheKey;
 
-    return {
-      options: opts,
-      passes: this.passes,
-    };
+    return { options, passes, cacheKey };
   }
 }
 
@@ -149,6 +157,7 @@ type BasicDescriptor = {
   options: {} | void,
   dirname: string,
   alias: string,
+  cacheKey: CacheKey,
 };
 
 type LoadedDescriptor = {
@@ -156,6 +165,7 @@ type LoadedDescriptor = {
   options: {},
   dirname: string,
   alias: string,
+  inputKey: CacheKey,
 };
 
 /**
@@ -172,6 +182,8 @@ const loadConfig = makeWeakCache((config: MergeOptions): {
     createDescriptor(plugin, loadPlugin, config.dirname, {
       index,
       alias: config.alias,
+      type: "plugin",
+      cacheKey: config.options.cacheKey,
     }),
   );
 
@@ -179,6 +191,8 @@ const loadConfig = makeWeakCache((config: MergeOptions): {
     createDescriptor(preset, loadPreset, config.dirname, {
       index,
       alias: config.alias,
+      type: "preset",
+      cacheKey: config.options.cacheKey,
     }),
   );
 
@@ -190,7 +204,7 @@ const loadConfig = makeWeakCache((config: MergeOptions): {
  */
 const loadDescriptor = makeWeakCache(
   (
-    { value, options = {}, dirname, alias }: BasicDescriptor,
+    { value, options = {}, dirname, alias, cacheKey }: BasicDescriptor,
     cache: CacheConfigurator<{ envName: string }>,
   ): LoadedDescriptor => {
     let item = value;
@@ -220,7 +234,16 @@ const loadDescriptor = makeWeakCache(
       );
     }
 
-    return { value: item, options, dirname, alias };
+    return {
+      value: item,
+      options,
+      dirname,
+      alias,
+      inputKey: buildCacheKey(
+        cacheKey,
+        buildCacheKey.obj(((cache.pairs(): any): Array<CacheKey>)),
+      ),
+    };
   },
 );
 
@@ -248,7 +271,7 @@ function loadPluginDescriptor(
 
 const instantiatePlugin = makeWeakCache(
   (
-    { value, options, dirname, alias }: LoadedDescriptor,
+    { value, options, dirname, alias, inputKey }: LoadedDescriptor,
     cache: CacheConfigurator<{ envName: string }>,
   ): Plugin => {
     const pluginObj = validatePluginObject(value);
@@ -257,6 +280,14 @@ const instantiatePlugin = makeWeakCache(
     if (plugin.visitor) {
       plugin.visitor = traverse.explode(clone(plugin.visitor));
     }
+    if (plugin.cacheKey === undefined) {
+      plugin.cacheKey = buildCacheKey.error(
+        `No cache key given by plugin ${alias}. ` +
+          `Plugins must have a 'cacheKey' value to be usable with Babel's caching plugins.`,
+      );
+    } else {
+      plugin.cacheKey = buildCacheKey(inputKey, plugin.cacheKey);
+    }
 
     if (plugin.inherits) {
       const inheritsDescriptor = {
@@ -264,6 +295,7 @@ const instantiatePlugin = makeWeakCache(
         value: plugin.inherits,
         options,
         dirname,
+        cacheKey: buildCacheKey(inputKey, "inherits"),
       };
 
       // If the inherited plugin changes, reinstantiate this plugin.
@@ -271,6 +303,7 @@ const instantiatePlugin = makeWeakCache(
         loadPluginDescriptor(inheritsDescriptor, data.envName),
       );
 
+      plugin.cacheKey = buildCacheKey(inherits.cacheKey, plugin.cacheKey);
       plugin.pre = chain(inherits.pre, plugin.pre);
       plugin.post = chain(inherits.post, plugin.post);
       plugin.manipulateOptions = chain(
@@ -298,12 +331,19 @@ const loadPresetDescriptor = (
 };
 
 const instantiatePreset = makeWeakCache(
-  ({ value, dirname, alias }: LoadedDescriptor): MergeOptions => {
+  ({
+    value,
+    dirname,
+    alias,
+    options: inputOptions,
+  }: LoadedDescriptor): MergeOptions => {
+    const options = validate("preset", value);
     return {
       type: "preset",
-      options: validate("preset", value),
+      options,
       alias,
       dirname,
+      cacheKey: buildOptionsCacheKey(options, inputOptions),
     };
   },
 );
@@ -318,9 +358,13 @@ function createDescriptor(
   {
     index,
     alias,
+    type,
+    cacheKey,
   }: {
     index: number,
     alias: string,
+    type: "plugin" | "preset",
+    cacheKey: CacheKey,
   },
 ): BasicDescriptor {
   let options;
@@ -373,6 +417,7 @@ function createDescriptor(
     value,
     options,
     dirname,
+    cacheKey: buildCacheKey(cacheKey, type, index),
   };
 }
 

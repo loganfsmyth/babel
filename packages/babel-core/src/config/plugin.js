@@ -38,6 +38,12 @@ const VALIDATORS: ValidatorSet = {
   cacheKey: (assertCacheKey: Validator<
     $PropertyType<PluginObject, "cacheKey">,
   >),
+  loadFromCache: (assertFunction: Validator<
+    $PropertyType<PluginObject, "loadFromCache">,
+  >),
+  saveToCache: (assertFunction: Validator<
+    $PropertyType<PluginObject, "saveToCache">,
+  >),
 };
 
 function assertVisitorMap(key: string, value: mixed): VisitorMap {
@@ -92,6 +98,9 @@ export type PluginObject = {
 
   parserOverride?: Function,
   generatorOverride?: Function,
+
+  loadFromCache?: Function,
+  saveToCache?: Function,
 };
 
 export function validatePluginObject(obj: {}): PluginObject {
@@ -115,6 +124,9 @@ export default class Plugin {
   parserOverride: Function | void;
   generatorOverride: Function | void;
 
+  loadFromCache: Function | void;
+  saveToCache: Function | void;
+
   options: {};
   cacheKey: CacheKey;
 
@@ -128,6 +140,8 @@ export default class Plugin {
     this.visitor = plugin.visitor || {};
     this.parserOverride = plugin.parserOverride;
     this.generatorOverride = plugin.generatorOverride;
+    this.loadFromCache = plugin.loadFromCache;
+    this.saveToCache = plugin.saveToCache;
 
     this.options = options;
   }

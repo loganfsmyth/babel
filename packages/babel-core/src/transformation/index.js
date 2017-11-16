@@ -2,7 +2,11 @@
 import traverse from "@babel/traverse";
 import type { SourceMap } from "convert-source-map";
 
+import buildCacheKey from "@babel/helper-caching";
+
 import type { ResolvedConfig, PluginPasses } from "../config";
+
+import { CACHE_KEY } from "../index";
 
 import PluginPass from "./plugin-pass";
 import loadBlockHoistPlugin from "./block-hoist-plugin";
@@ -24,6 +28,53 @@ export type FileResult = {
   code: string | null,
   map: SourceMap | null,
 };
+
+type CacheItem = {
+  result: FileResult,
+};
+function loadFromCache(
+  passes: PluginPasses,
+  key: string,
+  filename: string | void,
+): CacheItem | null {
+  for (const pass of passes) {
+    for (const plugin of pass) {
+      const { loadFromCache } = plugin;
+      if (loadFromCache) {
+        const result = loadFromCache(key, filename);
+        if (result !== undefined) return result;
+      }
+    }
+  }
+
+  return null;
+}
+
+function saveToCache(
+  passes: PluginPasses,
+  key: string,
+  filename: string | void,
+  cached: CacheItem,
+): void {
+  for (const pass of passes) {
+    for (const plugin of pass) {
+      const { saveToCache } = plugin;
+      if (saveToCache) {
+        saveToCache(key, filename, cached);
+      }
+    }
+  }
+}
+
+function hasCachePlugins(passes: PluginPasses) {
+  for (const pass of passes) {
+    for (const plugin of pass) {
+      const { saveToCache, loadFromCache } = plugin;
+      if (saveToCache || loadFromCache) return true;
+    }
+  }
+  return false;
+}
 
 export function runAsync(
   config: ResolvedConfig,
@@ -48,26 +99,58 @@ export function runSync(
   code: string,
   ast: ?(BabelNodeFile | BabelNodeProgram),
 ): FileResult {
-  const file = normalizeFile(
-    config.passes,
-    normalizeOptions(config),
-    code,
-    ast,
-  );
+  const cacheKey = hasCachePlugins(config.passes)
+    ? // If we weren't using loose mode, we could just do `${buildCacheKey(...)}`.
+      // $FlowIgnore - We want to explicitly trigger ToPrimitive(..., hint String)
+      "".concat(
+        buildCacheKey(
+          CACHE_KEY,
+          config.options.cacheKey,
+          code,
+          ast ? buildCacheKey.lazy(() => JSON.stringify(ast)) : undefined,
+        ),
+      )
+    : null;
 
-  transformFile(file, config.passes);
+  let cached =
+    cacheKey === null
+      ? null
+      : loadFromCache(config.passes, cacheKey, config.options.filename);
 
-  const opts = file.opts;
-  const { outputCode, outputMap } =
-    opts.code !== false ? generateCode(config.passes, file) : {};
+  let result;
+  if (cached) {
+    result = cached.result;
+  } else {
+    const file = normalizeFile(
+      config.passes,
+      normalizeOptions(config),
+      code,
+      ast,
+    );
 
-  return {
-    metadata: file.metadata,
-    options: opts,
-    ast: opts.ast !== false ? file.ast : null,
-    code: outputCode === undefined ? null : outputCode,
-    map: outputMap === undefined ? null : outputMap,
-  };
+    transformFile(file, config.passes);
+
+    const opts = file.opts;
+    const { outputCode, outputMap } =
+      opts.code !== false ? generateCode(config.passes, file) : {};
+
+    result = {
+      metadata: file.metadata,
+      options: opts,
+      ast: opts.ast !== false ? file.ast : null,
+      code: outputCode === undefined ? null : outputCode,
+      map: outputMap === undefined ? null : outputMap,
+    };
+
+    if (cacheKey !== null) {
+      saveToCache(config.passes, cacheKey, config.options.filename, {
+        result,
+        checks: [],
+      });
+    }
+  }
+
+  return result;
 }
 
 function transformFile(file: File, pluginPasses: PluginPasses): void {

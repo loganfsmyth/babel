@@ -78,7 +78,18 @@ export default function(api, opts = {}) {
       modules === "systemjs" && [transformES2015ModulesSystemJS, optsLoose],
       modules === "amd" && [transformES2015ModulesAMD, optsLoose],
       modules === "umd" && [transformES2015ModulesUMD, optsLoose],
-      [transformRegenerator, { async: false, asyncGenerators: false }],
+      [
+        (...args) => {
+          const result = transformRegenerator(...args);
+
+          return {
+            ...result,
+            // TODO: Temp inject a cache key.
+            cacheKey: "",
+          };
+        },
+        { async: false, asyncGenerators: false },
+      ],
     ].filter(Boolean), // filter out falsy values
   };
 }

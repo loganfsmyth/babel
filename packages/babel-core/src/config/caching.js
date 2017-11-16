@@ -1,19 +1,5 @@
 // @flow
 
-export type SimpleCacheConfigurator = SimpleCacheConfiguratorFn &
-  SimpleCacheConfiguratorObj;
-
-type SimpleCacheConfiguratorFn = {
-  (boolean): void,
-  <T>(handler: () => T): T,
-};
-type SimpleCacheConfiguratorObj = {
-  forever: () => void,
-  never: () => void,
-  using: <T>(handler: () => T) => T,
-  invalidate: <T>(handler: () => T) => T,
-};
-
 type CacheEntry<ResultT, SideChannel> = Array<
   [ResultT, (SideChannel) => boolean],
 >;
@@ -115,10 +101,6 @@ class CacheConfigurator<SideChannel = void> {
     this._data = data;
   }
 
-  simple() {
-    return makeSimpleConfigurator(this);
-  }
-
   mode() {
     if (this._never) return "never";
     if (this._forever) return "forever";
@@ -181,6 +163,10 @@ class CacheConfigurator<SideChannel = void> {
     return key;
   }
 
+  pairs(): Array<mixed> {
+    return this._pairs.map(pair => pair[0]);
+  }
+
   validator(): SideChannel => boolean {
     const pairs = this._pairs;
     return (data: SideChannel) => pairs.every(([key, fn]) => key === fn(data));
@@ -193,24 +179,4 @@ class CacheConfigurator<SideChannel = void> {
   configured() {
     return this._configured;
   }
-}
-
-function makeSimpleConfigurator(
-  cache: CacheConfigurator<any>,
-): SimpleCacheConfigurator {
-  function cacheFn(val) {
-    if (typeof val === "boolean") {
-      if (val) cache.forever();
-      else cache.never();
-      return;
-    }
-
-    return cache.using(val);
-  }
-  cacheFn.forever = () => cache.forever();
-  cacheFn.never = () => cache.never();
-  cacheFn.using = cb => cache.using(() => cb());
-  cacheFn.invalidate = cb => cache.invalidate(() => cb());
-
-  return (cacheFn: any);
 }

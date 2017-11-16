@@ -1,5 +1,21 @@
 // @flow
-import type { CacheConfigurator, SimpleCacheConfigurator } from "../caching";
+import { validKey } from "@babel/helper-caching";
+
+import type { CacheConfigurator } from "../caching";
+
+export type SimpleCacheConfigurator = SimpleCacheConfiguratorFn &
+  SimpleCacheConfiguratorObj;
+
+type SimpleCacheConfiguratorFn = {
+  (boolean): void,
+  <T>(handler: () => T): T,
+};
+type SimpleCacheConfiguratorObj = {
+  forever: () => void,
+  never: () => void,
+  using: <T>(handler: () => T) => T,
+  invalidate: <T>(handler: () => T) => T,
+};
 
 type EnvFunction = {
   (): string,
@@ -32,9 +48,45 @@ export default function makeAPI(
     });
 
   return {
-    cache: cache.simple(),
+    cache: makeSimpleConfigurator(cache),
     // Expose ".env()" so people can easily get the same env that we expose using the "env" key.
     env,
     async: () => false,
   };
+}
+
+function makeSimpleConfigurator(
+  cache: CacheConfigurator<any>,
+): SimpleCacheConfigurator {
+  function cacheFn(val) {
+    if (typeof val === "boolean") {
+      if (val) cache.forever();
+      else cache.never();
+      return;
+    }
+
+    return cache.using(val);
+  }
+  cacheFn.forever = () => cache.forever();
+  cacheFn.never = () => cache.never();
+  cacheFn.using = cb => {
+    const val = cache.using(() => cb());
+    assertValidKey(val);
+    return val;
+  };
+  cacheFn.invalidate = cb => {
+    const val = cache.invalidate(() => cb());
+    assertValidKey(val);
+    return val;
+  };
+
+  return (cacheFn: any);
+}
+
+function assertValidKey(key: mixed): void {
+  if (!validKey(key)) {
+    throw new Error(
+      `Values must be non-undefined primitives, or have meaningful toString implementations for caching`,
+    );
+  }
 }

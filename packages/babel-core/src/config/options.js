@@ -31,6 +31,10 @@ const ROOT_VALIDATORS: ValidatorSet = {
   >),
   code: (assertBoolean: Validator<$PropertyType<ValidatedOptions, "code">>),
   ast: (assertBoolean: Validator<$PropertyType<ValidatedOptions, "ast">>),
+
+  envName: (assertString: Validator<
+    $PropertyType<ValidatedOptions, "envName">,
+  >),
 };
 
 const NONPRESET_VALIDATORS: ValidatorSet = {
@@ -139,6 +143,7 @@ export type ValidatedOptions = {
   code?: boolean,
   ast?: boolean,
   inputSourceMap?: RootInputSourceMapOption,
+  envName?: string,
 
   extends?: string,
   env?: EnvSet<ValidatedOptions>,

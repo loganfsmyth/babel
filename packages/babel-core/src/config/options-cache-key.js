@@ -43,10 +43,12 @@ export function buildOptionsCacheKey(
           }, {}),
         );
       } else if (!inputValues.has(val) && !opts.cacheKey) {
-        return buildCacheKey.error(
-          `No cacheKey given by config. Configs with complex types like functions ` +
-            `must have a 'cacheKey' value to be usable with Babel's caching plugins.`,
-        );
+        return buildCacheKey.lazy(() => {
+          console.warn(
+            `No cacheKey given by config. Configs with complex types like functions ` +
+              `must have a 'cacheKey' value to be usable with Babel's caching plugins.`,
+          );
+        });
       } else {
         // If this code is running, it means the user provided a cache key,
         // so we consider unknown values

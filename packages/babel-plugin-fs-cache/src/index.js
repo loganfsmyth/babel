@@ -41,15 +41,19 @@ export default function pluginFsCache(api, options, dirname) {
    */
   const getFilepath = (key: string) => {
     // Slicing to '32' so that we don't create super long filenames.
-    path.resolve(cacheDir, `${key.slice(0, 32)}.json.gz`);
+    return path.resolve(cacheDir, `${key.slice(0, 32)}.json.gz`);
   };
 
   return {
     cacheKey: CACHE_KEY,
     loadFromCache(key: string): string | null {
-      const content = zlib
-        .gunzipSync(fs.readFileSync(getFilepath(key)))
-        .toString();
+      let content;
+      try {
+        content = zlib.gunzipSync(fs.readFileSync(getFilepath(key))).toString();
+      } catch (err) {
+        // Catch file doesn't exist errors, re-throw the rest?
+        return;
+      }
 
       // Since we slice the filename, it's possible that there is a collision,
       // so we validate that the cached content matches the key.
@@ -60,6 +64,7 @@ export default function pluginFsCache(api, options, dirname) {
     saveToCache(key: string, filename: string | void, data: string): void {
       const content = key + data;
 
+      // Are there any errors this could throw that we'd want to catch?
       fs.writeFileSync(getFilepath(key), zlib.gzipSync(content));
     },
   };

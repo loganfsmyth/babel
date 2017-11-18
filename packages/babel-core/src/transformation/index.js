@@ -56,7 +56,14 @@ function loadFromCache(
       const { loadFromCache } = plugin;
       if (loadFromCache) {
         const result = loadFromCache(key, filename);
-        if (result !== undefined) return result;
+        if (result !== undefined) {
+          try {
+            return JSON.parse(result);
+          } catch (err) {
+            debug(`Corrupt cache JSON content skipped`);
+            return null;
+          }
+        }
       }
     }
   }
@@ -70,11 +77,18 @@ function saveToCache(
   filename: string | void,
   cached: CacheItem,
 ): void {
+  let content;
+
   for (const pass of passes) {
     for (const plugin of pass) {
       const { saveToCache } = plugin;
       if (saveToCache) {
-        saveToCache(key, filename, cached);
+        if (content === undefined) {
+          content = JSON.stringify(cached);
+        }
+
+        const result = saveToCache(key, filename, content);
+        if (result !== undefined) return;
       }
     }
   }

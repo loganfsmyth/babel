@@ -284,10 +284,14 @@ const instantiatePlugin = makeWeakCache(
       plugin.cached = clone(plugin.cached);
     }
     if (plugin.cacheKey === undefined) {
-      plugin.cacheKey = buildCacheKey.error(
-        `No cache key given by plugin ${alias}. ` +
-          `Plugins must have a 'cacheKey' value to be usable with Babel's caching plugins.`,
-      );
+      plugin.cacheKey = buildCacheKey.lazy(() => {
+        console.warn(
+          `No cache key given by plugin ${alias}. ` +
+            `Changes to this plugin may not properly invalidate your cache.`,
+        );
+
+        return "";
+      });
     } else {
       plugin.cacheKey = buildCacheKey(inputKey, plugin.cacheKey);
     }

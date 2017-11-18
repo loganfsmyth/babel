@@ -152,4 +152,12 @@ export default class Plugin {
 
     this.options = options;
   }
+
+  toJSON() {
+    return {
+      key: this.key,
+      // $FlowIgnore
+      cacheKey: "".concat(this.cacheKey),
+    };
+  }
 }

@@ -248,6 +248,8 @@ function buildArgumentsItem(
 const flattenFileOptionsParts = makeWeakCache((file: ConfigFile) => {
   const options = validate("file", file.options);
 
+  console.log(options);
+
   return flattenOptionsPartsLookup({
     type: "file",
     options,

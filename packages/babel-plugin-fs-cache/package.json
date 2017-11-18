@@ -1,6 +1,6 @@
 {
   "name": "@babel/plugin-fs-cache",
-  "version": "7.0.0-beta.31",
+  "version": "7.0.0-beta.32",
   "description": "Babel plugin to enable filesystem caching in Babel's loading process",
   "author": "Logan Smyth <loganfsmyth@gmail.com>",
   "homepage": "https://babeljs.io/",
@@ -11,9 +11,9 @@
     "version": "node ../../scripts/lerna-version.js"
   },
   "peerDependencies": {
-    "@babel/core": "7.0.0-beta.31"
+    "@babel/core": "7.0.0-beta.32"
   },
   "devDependencies": {
-    "@babel/core": "7.0.0-beta.31"
+    "@babel/core": "7.0.0-beta.32"
   }
 }

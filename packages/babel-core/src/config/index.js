@@ -1,5 +1,7 @@
 // @flow
 
+export { DEFAULT_EXTENSIONS } from "./util";
+
 import loadFullConfig from "./full";
 export type {
   ResolvedConfig,

@@ -33,14 +33,12 @@ export { parse, parseSync, parseAsync } from "./parse";
 /**
  * Recommended set of compilable extensions. Not used in @babel/core directly, but meant as
  * as an easy source for tooling making use of @babel/core.
+ *
+ * Unless you really _need_ to have an explicit list of extensions, it is
+ * recommended that you simply call Babel, and if it returns `null`, continue
+ * with whatever default behavior you'd normally do with that file.
  */
-export const DEFAULT_EXTENSIONS = Object.freeze([
-  ".js",
-  ".jsx",
-  ".es6",
-  ".es",
-  ".mjs",
-]);
+export { DEFAULT_EXTENSIONS } from "./config";
 
 // For easier backward-compatibility, provide an API like the one we exposed in Babel 6.
 import { loadOptions } from "./config";

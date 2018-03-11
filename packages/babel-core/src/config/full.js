@@ -1,6 +1,7 @@
 // @flow
 
-import { mergeOptions } from "./util";
+import path from "path";
+import { mergeOptions, DEFAULT_EXTENSIONS_MAP } from "./util";
 import * as context from "../index";
 import Plugin from "./plugin";
 import { getItemDescriptor } from "./item";
@@ -146,6 +147,20 @@ export default function loadFullConfig(
   const opts: Object = optionDefaults;
   mergeOptions(opts, options);
 
+  const extensions = (opts.extensions = opts.extensions || {});
+
+  for (const ext of Object.keys(DEFAULT_EXTENSIONS_MAP)) {
+    if (extensions[ext] === undefined) {
+      extensions[ext] = DEFAULT_EXTENSIONS_MAP[ext];
+    }
+  }
+
+  const filename = context.filename;
+  if (typeof filename === "string") {
+    const ext = findLongestExtension(filename, extensions);
+    if (typeof ext === "string" && !extensions[ext]) return null;
+  }
+
   opts.plugins = passes[0];
   opts.presets = passes
     .slice(1)
@@ -157,6 +172,41 @@ export default function loadFullConfig(
     options: opts,
     passes: passes,
   };
+}
+
+/**
+ * To allow Babel to properly opt _into_ .ts files while opting _out_ of .d.ts,
+ * we walk the extension object explicitly to find the longest extension that
+ * exists in the object.
+ */
+function findLongestExtension(
+  filename: string,
+  extensionMap: { [string]: mixed },
+): string | void {
+  // If there just wasn't any extension, skip it entirely unless someone has
+  // explicitly put an empty-string in the extension map.
+  if (path.extname(filename) === "" && !has(extensionMap, "")) {
+    return undefined;
+  }
+
+  // Collect the set of extensions that exist in the extensions object.
+  let longestExtension = "";
+  let ext = "";
+  while (true) {
+    const nextExt = path.extname(path.basename(filename, ext));
+    if (!nextExt) break;
+    ext = nextExt + ext;
+
+    if (!has(extensionMap, ext)) break;
+
+    longestExtension = ext;
+  }
+
+  return longestExtension;
+}
+
+function has(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 /**

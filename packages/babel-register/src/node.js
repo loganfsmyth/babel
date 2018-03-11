@@ -111,6 +111,15 @@ export default function register(opts?: Object = {}) {
   opts = {
     ...opts,
   };
+
+  // Should we do this, or should we try to resolve the extension list
+  // based on purely the presets/plugins inside the babel.config.js file?
+  let extensions = {};
+  if (opts.extensions && typeof opts.extensions === "object") {
+    extensions = Object.keys(opts.extensions);
+  } else {
+  }
+
   hookExtensions(opts.extensions || DEFAULT_EXTENSIONS);
 
   if (opts.cache === false && cache) {
@@ -123,6 +132,12 @@ export default function register(opts?: Object = {}) {
 
   delete opts.extensions;
   delete opts.cache;
+
+  if (extensions !== undefined && !Array.isArray(extensions)) {
+    throw new Error(
+      "@babel/register requires .extensions to be an array, or undefined.",
+    );
+  }
 
   transformOpts = {
     ...opts,

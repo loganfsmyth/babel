@@ -201,7 +201,7 @@ export function buildRootChain(
   return {
     plugins: dedupDescriptors(chain.plugins),
     presets: dedupDescriptors(chain.presets),
-    options: chain.options.map(o => normalizeOptions(o)),
+    options: chain.options,
     ignore: ignoreFile || undefined,
     babelrc: babelrcFile || undefined,
     config: configFile || undefined,
@@ -423,12 +423,23 @@ function makeChainWalker<ArgT: { options: ValidatedOptions, dirname: string }>({
     const chain = emptyChain();
 
     for (const op of flattenedConfigs) {
+      if (
+        op.options.extensions &&
+        typeof context.filename !== "string"
+      ) {
+        throw new Error(
+          `Configuration contains .extensions, but no filename was passed to Babel`,
+        );
+      }
+
       if (!mergeExtendsChain(chain, op.options, dirname, context, files)) {
         return null;
       }
 
       mergeChainOpts(chain, op);
     }
+
+    chain.options = chain.options.map(o => normalizeOptions(o));
     return chain;
   };
 }

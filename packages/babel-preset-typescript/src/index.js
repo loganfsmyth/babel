@@ -17,6 +17,18 @@ export default declare(
     }
 
     return {
+      // Leave 'extensions' out of the 'overrides' because it should be activated
+      // even if no filename has been given to Babel. This allows Babel to
+      // potentially pick up the extension list when doing an up-front loading
+      // of Babel's root config.
+      extensions: {
+        ".ts": true,
+        ".tsx": true,
+
+        // Ensure that Babel skips these, since otherwise it will just see them
+        // as simple .ts files.
+        ".d.ts": false,
+      },
       overrides: allExtensions
         ? [
             {

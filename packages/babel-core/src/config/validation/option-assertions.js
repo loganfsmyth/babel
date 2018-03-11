@@ -8,6 +8,7 @@ import type {
   PluginList,
   PluginItem,
   PluginTarget,
+  ExtensionMap,
   ConfigApplicableTest,
   SourceMapsOption,
   SourceTypeOption,
@@ -112,6 +113,22 @@ export function assertArray(key: string, value: mixed): ?$ReadOnlyArray<mixed> {
     throw new Error(`.${key} must be an array, or undefined`);
   }
   return value;
+}
+
+export function assertExtensionMap(
+  key: string,
+  value: mixed,
+): ExtensionMap | void {
+  const obj = assertObject(key, value);
+  if (obj) {
+    for (const ext of Object.keys(obj)) {
+      if (typeof obj[ext] !== "boolean") {
+        throw new Error(`.${key}["${ext}"] must be an boolean`);
+      }
+    }
+  }
+
+  return (obj: any);
 }
 
 export function assertIgnoreList(key: string, value: mixed): IgnoreList | void {

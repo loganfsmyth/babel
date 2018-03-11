@@ -9,6 +9,7 @@ import {
   assertBoolean,
   assertObject,
   assertArray,
+  assertExtensionMap,
   assertInputSourceMap,
   assertIgnoreList,
   assertPluginList,
@@ -158,6 +159,9 @@ const COMMON_VALIDATORS: ValidatorSet = {
   generatorOpts: (assertObject: Validator<
     $PropertyType<ValidatedOptions, "generatorOpts">,
   >),
+  extensions: (assertExtensionMap: Validator<
+    $PropertyType<ValidatedOptions, "extensions">,
+  >),
 };
 export type InputOptions = ValidatedOptions;
 
@@ -216,10 +220,16 @@ export type ValidatedOptions = {
   moduleIds?: boolean,
   moduleId?: string,
 
+  extensions?: ExtensionMap,
+
   // Deprecate top level parserOpts
   parserOpts?: {},
   // Deprecate top level generatorOpts
   generatorOpts?: {},
+};
+
+export type ExtensionMap = {
+  [string]: boolean,
 };
 
 export type EnvSet<T> = {

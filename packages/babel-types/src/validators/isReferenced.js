@@ -4,6 +4,16 @@
  */
 export default function isReferenced(node: Object, parent: Object): boolean {
   switch (parent.type) {
+    // yes: enum Foo { Thing = NODE }
+    // no: enum Foo { NODE }
+    case "TSEnumMember":
+      return parent.id !== node;
+
+    // yes: object::NODE
+    // yes: NODE::callee
+    case "BindExpression":
+      return parent.object === node || parent.callee === node;
+
     // yes: PARENT[NODE]
     // yes: NODE.child
     // no: parent.NODE

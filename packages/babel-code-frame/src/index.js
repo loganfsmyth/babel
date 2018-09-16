@@ -1,21 +1,17 @@
-import highlight, { shouldHighlight, getChalk } from "@babel/highlight";
+// @flow
+
+import highlight, {
+  shouldHighlight,
+  getChalk,
+  type Chalk,
+} from "@babel/highlight";
 
 let deprecationWarningShown = false;
-
-type Location = {
-  column: number,
-  line: number,
-};
-
-type NodeLocation = {
-  end: Location,
-  start: Location,
-};
 
 /**
  * Chalk styles for code frame token types.
  */
-function getDefs(chalk) {
+function getDefs(chalk: Chalk) {
   return {
     gutter: chalk.grey,
     marker: chalk.red.bold,
@@ -32,26 +28,15 @@ const NEWLINE = /\r\n|[\n\r\u2028\u2029]/;
 /**
  * Extract what lines should be marked and highlighted.
  */
-
 function getMarkerLines(
-  loc: NodeLocation,
+  {
+    start: { line: startLine = 0, column: startColumn = -1 } = {},
+    end: { line: endLine = startLine, column: endColumn = startColumn } = {},
+  }: NodeLocation,
   source: Array<string>,
-  opts: Object,
-): { start: number, end: number, markerLines: Object } {
-  const startLoc: Location = {
-    column: 0,
-    line: -1,
-    ...loc.start,
-  };
-  const endLoc: Location = {
-    ...startLoc,
-    ...loc.end,
-  };
+  opts: Options,
+): { start: number, end: number, markerLines: { [number]: [number, number] } } {
   const { linesAbove = 2, linesBelow = 3 } = opts || {};
-  const startLine = startLoc.line;
-  const startColumn = startLoc.column;
-  const endLine = endLoc.line;
-  const endColumn = endLoc.column;
 
   let start = Math.max(startLine - (linesAbove + 1), 0);
   let end = Math.min(source.length, endLine + linesBelow);
@@ -100,17 +85,35 @@ function getMarkerLines(
   return { start, end, markerLines };
 }
 
+export type Location = {
+  line?: number,
+  column?: number,
+};
+
+export type NodeLocation = {
+  start?: Location,
+  end?: Location,
+};
+
+type Options = {
+  highlightCode?: boolean,
+  forceColor?: boolean,
+  message?: string,
+  linesAbove?: number,
+  linesBelow?: number,
+};
+
 export function codeFrameColumns(
   rawLines: string,
   loc: NodeLocation,
-  opts: Object = {},
+  opts: Options = {},
 ): string {
   const highlighted =
     (opts.highlightCode || opts.forceColor) && shouldHighlight(opts);
   const chalk = getChalk(opts);
   const defs = getDefs(chalk);
-  const maybeHighlight = (chalkFn, string) => {
-    return highlighted ? chalkFn(string) : string;
+  const maybeHighlight = (chalkFn: Chalk, str: string) => {
+    return highlighted ? chalkFn(str) : str;
   };
   if (highlighted) rawLines = highlight(rawLines, opts);
 
@@ -160,7 +163,8 @@ export function codeFrameColumns(
     .join("\n");
 
   if (opts.message && !hasColumns) {
-    frame = `${" ".repeat(numberMaxWidth + 1)}${opts.message}\n${frame}`;
+    const { message } = opts;
+    frame = `${" ".repeat(numberMaxWidth + 1)}${message}\n${frame}`;
   }
 
   if (highlighted) {
@@ -173,12 +177,11 @@ export function codeFrameColumns(
 /**
  * Create a code frame, adding line numbers, code highlighting, and pointing to a given position.
  */
-
 export default function(
   rawLines: string,
   lineNumber: number,
   colNumber: ?number,
-  opts: Object = {},
+  opts: Options = {},
 ): string {
   if (!deprecationWarningShown) {
     deprecationWarningShown = true;
@@ -197,7 +200,8 @@ export default function(
     }
   }
 
-  colNumber = Math.max(colNumber, 0);
+  if (colNumber == null) colNumber = undefined;
+  if (typeof colNumber === "number") colNumber = Math.max(colNumber, 0);
 
   const location: NodeLocation = {
     start: { column: colNumber, line: lineNumber },

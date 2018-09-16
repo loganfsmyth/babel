@@ -1,22 +1,24 @@
+// @flow
+
 import jsTokens, { matchToToken } from "js-tokens";
 import esutils from "esutils";
-import Chalk from "chalk";
+import chalk, { type Chalk } from "chalk";
 
 /**
  * Chalk styles for token types.
  */
-function getDefs(chalk) {
+function getDefs(ch: Chalk) {
   return {
-    keyword: chalk.cyan,
-    capitalized: chalk.yellow,
-    jsx_tag: chalk.yellow,
-    punctuator: chalk.yellow,
+    keyword: ch.cyan,
+    capitalized: ch.yellow,
+    jsx_tag: ch.yellow,
+    punctuator: ch.yellow,
     // bracket:  intentionally omitted.
-    number: chalk.magenta,
-    string: chalk.green,
-    regex: chalk.magenta,
-    comment: chalk.grey,
-    invalid: chalk.white.bgRed.bold,
+    number: ch.magenta,
+    string: ch.green,
+    regex: ch.magenta,
+    comment: ch.grey,
+    invalid: ch.white.bgRed.bold,
   };
 }
 
@@ -38,9 +40,25 @@ const BRACKET = /^[()[\]{}]$/;
 /**
  * Get the type of token, specifying punctuator type.
  */
-function getTokenType(match) {
-  const [offset, text] = match.slice(-2);
-  const token = matchToToken(match);
+function getTokenType(match: Array<mixed>) {
+  const items = match.slice(-2);
+  const offset = items[0];
+  const text = items[1];
+  if (typeof offset !== "number") {
+    throw new Error("Assertion failure - expected number");
+  }
+  if (typeof text !== "string") {
+    throw new Error("Assertion failure - expected string");
+  }
+
+  const token = matchToToken(
+    Array.from(match, item => {
+      if (typeof item !== "string") {
+        throw new Error("Assertion failure - expected string");
+      }
+      return item;
+    }),
+  );
 
   if (token.type === "name") {
     if (esutils.keyword.isReservedWordES6(token.value)) {
@@ -76,18 +94,20 @@ function getTokenType(match) {
 /**
  * Highlight `text` using the token definitions in `defs`.
  */
-function highlightTokens(defs: Object, text: string) {
-  return text.replace(jsTokens, function(...args) {
+function highlightTokens(defs: { [string]: Chalk }, text: string) {
+  return text.replace(jsTokens, function(...args: Array<mixed>) {
     const type = getTokenType(args);
+    const str = args[0];
+    if (typeof str !== "string") throw new Error("");
+
     const colorize = defs[type];
     if (colorize) {
-      return args[0]
+      return str
         .split(NEWLINE)
         .map(str => colorize(str))
         .join("\n");
-    } else {
-      return args[0];
     }
+    return str;
   });
 }
 
@@ -95,20 +115,21 @@ type Options = {
   forceColor?: boolean,
 };
 
+export type { Chalk };
+
 /**
  * Whether the code should be highlighted given the passed options.
  */
 export function shouldHighlight(options: Options): boolean {
-  return Chalk.supportsColor || options.forceColor;
+  return !!chalk.supportsColor || !!options.forceColor;
 }
 
 /**
  * The Chalk instance that should be used given the passed options.
  */
-export function getChalk(options: Options) {
-  let chalk = Chalk;
+export function getChalk(options: Options): Chalk {
   if (options.forceColor) {
-    chalk = new Chalk.constructor({ enabled: true, level: 1 });
+    return new chalk.constructor({ enabled: true, level: 1 });
   }
   return chalk;
 }

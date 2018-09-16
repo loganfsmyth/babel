@@ -32,6 +32,64 @@ declare module "lodash/merge" {
   declare export default <T: Object>(T, Object) => T;
 }
 
+declare module "esutils" {
+  declare module.exports: {
+    keyword: {
+      isReservedWordES6(ident: string, strict?: boolean): boolean,
+      isIdentifierNameES6(ident: string): boolean,
+    },
+  };
+}
+
+declare module "js-tokens" {
+  declare export type InvalidToken = {
+    type: "invalid",
+    value: "string",
+  };
+  declare export type StringToken = {
+    type: "string",
+    value: "string",
+  };
+  declare export type CommentToken = {
+    type: "comment",
+    value: "string",
+    closed: boolean | void,
+  };
+  declare export type RegexToken = {
+    type: "regex",
+    value: "string",
+  };
+  declare export type NumberToken = {
+    type: "number",
+    value: "string",
+  };
+  declare export type NameToken = {
+    type: "name",
+    value: "string",
+  };
+  declare export type PunctuatorToken = {
+    type: "punctuator",
+    value: "string",
+  };
+  declare export type WhitespaceToken = {
+    type: "whitespace",
+    value: "string",
+  };
+
+  declare export type Token =
+    | InvalidToken
+    | StringToken
+    | CommentToken
+    | RegexToken
+    | NumberToken
+    | NameToken
+    | PunctuatorToken
+    | WhitespaceToken;
+
+  declare export default RegExp;
+  declare export function matchToToken(match: Array<string>): Token;
+}
+
 declare module "semver" {
   declare module.exports: {
     valid(v: string): boolean;

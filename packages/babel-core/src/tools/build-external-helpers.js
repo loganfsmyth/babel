@@ -1,3 +1,5 @@
+// @flow
+
 import * as helpers from "@babel/helpers";
 import generator from "@babel/generator";
 import template from "@babel/template";
@@ -6,7 +8,7 @@ import * as t from "@babel/types";
 // Wrapped to avoid wasting time parsing this when almost no-one uses
 // build-external-helpers.
 const buildUmdWrapper = replacements =>
-  template`
+  template.statement`
     (function (root, factory) {
       if (typeof define === "function" && define.amd) {
         define(AMD_ARGUMENTS, factory);
@@ -20,7 +22,7 @@ const buildUmdWrapper = replacements =>
     });
   `(replacements);
 
-function buildGlobal(whitelist) {
+function buildGlobal(whitelist?: Array<string>) {
   const namespace = t.identifier("babelHelpers");
 
   const body = [];
@@ -64,7 +66,7 @@ function buildGlobal(whitelist) {
   return tree;
 }
 
-function buildModule(whitelist) {
+function buildModule(whitelist?: Array<string>) {
   const body = [];
   const refs = buildHelpers(body, null, whitelist);
 
@@ -80,7 +82,7 @@ function buildModule(whitelist) {
   return t.program(body, [], "module");
 }
 
-function buildUmd(whitelist) {
+function buildUmd(whitelist?: Array<string>) {
   const namespace = t.identifier("babelHelpers");
 
   const body = [];
@@ -108,7 +110,7 @@ function buildUmd(whitelist) {
   ]);
 }
 
-function buildVar(whitelist) {
+function buildVar(whitelist?: Array<string>) {
   const namespace = t.identifier("babelHelpers");
 
   const body = [];
@@ -123,7 +125,11 @@ function buildVar(whitelist) {
   return tree;
 }
 
-function buildHelpers(body, namespace, whitelist) {
+function buildHelpers(
+  body: Array<BabelNodeStatement>,
+  namespace: BabelNodeIdentifier | null,
+  whitelist?: Array<string>,
+) {
   const getHelperReference = name => {
     return namespace
       ? t.memberExpression(namespace, t.identifier(name))
@@ -142,12 +148,11 @@ function buildHelpers(body, namespace, whitelist) {
   });
   return refs;
 }
-export default function(
+
+export default function buildExternalHelpers(
   whitelist?: Array<string>,
   outputType: "global" | "module" | "umd" | "var" = "global",
 ) {
-  let tree;
-
   const build = {
     global: buildGlobal,
     module: buildModule,
@@ -155,11 +160,10 @@ export default function(
     var: buildVar,
   }[outputType];
 
-  if (build) {
-    tree = build(whitelist);
-  } else {
+  if (!build) {
     throw new Error(`Unsupported output type ${outputType}`);
   }
+  const tree = build(whitelist);
 
   return generator(tree).code;
 }

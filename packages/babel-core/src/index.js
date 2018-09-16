@@ -1,5 +1,8 @@
 // @flow
 
+export type { InputOptions as Options } from "./config";
+export type { FileResult as TransformResult } from "./transformation";
+
 export { default as File } from "./transformation/file/file";
 export {
   default as buildExternalHelpers,

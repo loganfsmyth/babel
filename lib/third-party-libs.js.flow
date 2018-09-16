@@ -20,10 +20,150 @@ declare module "json5" {
   };
 }
 
-declare module "lodash/defaults" {
-  declare export default <T: Object>(T, Object) =>  T;
+declare module "glob" {
+  declare module.exports: {
+    sync(pattern: string): Array<string>,
+  };
+}
+declare module "slash" {
+  declare module.exports: {
+    (filepath: string): string,
+  };
 }
 
+declare module "commander" {
+  declare class Options { }
+
+  declare class Command {
+    static Command: Class<Command>;
+    static Option: Class<Option>;
+
+    args: Array<string>;
+
+    arguments(desc: string): this;
+    parseExpectedArgs(args: Array<string>): this;
+
+    command(name: string, opts: Options): Command;
+    command(name: string, desc: string, opts: Options): Command;
+    addImplicitHelpCommand(): Command;
+
+    action(cb: () => mixed): this;
+    option<T>(
+      flags: string,
+      desc: string,
+      fn?: RegExp | (value: string, prevValue: T) => T,
+      defaultValue?: T,
+    ): this;
+    option(
+      flags: string,
+      desc: string,
+      defaultValue: any,
+    ): this;
+    allowUnknownOption(name: string): this;
+
+    parse(argv: Array<string>): this;
+    parseOptions(argv: Array<string>): {
+      args: Array<string>,
+      unknown: Array<string>,
+    };
+
+    opts(): {
+      [string]: mixed,
+    };
+    version(str: string, flags?: string): this;
+    description(): string;
+    description(str: string): this;
+    alias(): string;
+    alias(str: string): this;
+    usage(): string;
+    usage(str: string): this;
+    name(): string;
+    name(str: string): this;
+    outputHelp<T>(cb?: T => T): void;
+    help<T>(cb?: T => T): void;
+  }
+
+  declare class Option {
+    name(): string;
+    attributeName(): string;
+    is(name: string, opts: Options): boolean;
+  }
+
+  declare module.exports: Command;
+}
+
+declare module "chokidar" {
+  declare type Paths = string | Array<string>;
+  declare type Options = {
+    persistent?: boolean,
+    ignoreInitial?: boolean,
+    ignorePermissionErrors?: boolean,
+    interval?: number,
+    binaryInterval?: number,
+    disableGlobbing?: boolean,
+    useFsEvents?: boolean,
+    usePolling?: boolean,
+    atomic?: boolean | number,
+    awaitWriteFinish?: {
+      stabilityThreshold?: number,
+      pollInterval?: number,
+    } | boolean,
+    ignored?: Paths,
+    followSymlinks?: boolean,
+    cwd?: string,
+    alwaysStat?: boolean,
+  };
+
+  declare type EventType =
+    | 'add'
+    | 'addDir'
+    | 'change'
+    | 'unlink'
+    | 'unlinkDir';
+
+  declare class FSWatcher {
+    constructor(opts: ?Options): this;
+    add(paths: Paths): this;
+    unwatch(paths: Paths): this;
+    close(): this;
+    getWatched(): {
+      [string]: Array<string>,
+    };
+    on("all", (type: EventType, path: string) => mixed): this;
+    on("add", (path: string) => mixed): this;
+    on("change", (path: string) => mixed): this;
+  }
+
+  declare module.exports: {
+    FSWatcher: Class<FSWatcher>,
+    watch(paths: Paths, options: ?Options): FSWatcher,
+  };
+}
+declare module "fs-readdir-recursive" {
+  declare module.exports: {
+    (
+      root: string,
+      filter?: ?(name: string, index: number, dir: string) => boolean,
+      files?: ?Array<string>,
+      prefix?: ?string,
+    ): Array<string>;
+  };
+}
+declare module "output-file-sync" {
+  declare module.exports: {
+    (filepath: string, content: string): void;
+  };
+}
+
+declare module "lodash/uniq" {
+  declare export default <T>(items: Array<T>) => Array<T>;
+}
+declare module "lodash/includes" {
+  declare export default <T>(items: Array<T>, item: T) => boolean;
+}
+declare module "lodash/defaults" {
+  declare export default <T: Object>(T, Object) => T;
+}
 declare module "lodash/clone" {
   declare export default <T>(obj: T) => T;
 }

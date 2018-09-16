@@ -1,8 +1,10 @@
+// @flow
+
 import commander from "commander";
 import { buildExternalHelpers } from "@babel/core";
 
-function collect(value, previousValue): Array<string> {
-  // If the user passed the option with no value, like "babel-external-helpers --whitelist", do nothing.
+function collect(value: string, previousValue: Array<string>): Array<string> {
+  // If the user passed the option with no value, like "babel file.js --presets", do nothing.
   if (typeof value !== "string") return previousValue;
 
   const values = value.split(",");
@@ -24,4 +26,8 @@ commander.option(
 commander.usage("[options]");
 commander.parse(process.argv);
 
-console.log(buildExternalHelpers(commander.whitelist, commander.outputType));
+const opts: Object = commander.opts();
+const whitelist: Array<string> = opts.whitelist;
+const outputType: any = opts.outputType;
+
+console.log(buildExternalHelpers(whitelist, outputType));

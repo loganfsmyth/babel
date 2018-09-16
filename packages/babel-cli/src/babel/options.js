@@ -1,11 +1,13 @@
+// @flow
+
 import fs from "fs";
 
 import commander from "commander";
-import { version } from "@babel/core";
+import * as babel from "@babel/core";
 import uniq from "lodash/uniq";
 import glob from "glob";
 
-import pkg from "../../package.json";
+import { version } from "../../package.json";
 
 // Standard Babel input configs.
 commander.option(
@@ -148,10 +150,32 @@ commander.option(
   "Delete the out directory before compilation",
 );
 
-commander.version(pkg.version + " (@babel/core " + version + ")");
+commander.version(version + " (@babel/core " + babel.version + ")");
 commander.usage("[options] <files ...>");
 
-export default function parseArgv(args: Array<string>) {
+type CLIOptions = {
+  filename: string | void,
+  filenames: Array<string>,
+  extensions: Array<string>,
+  keepFileExtension: boolean | void,
+  watch: boolean | void,
+  skipInitialBuild: boolean | void,
+  outFile: string | void,
+  outDir: string | void,
+  relative: string | void,
+  copyFiles: boolean | void,
+  includeDotfiles: boolean | void,
+  verbose: boolean | void,
+  deleteDirOnStart: boolean | void,
+  sourceMapTarget: string | void,
+};
+
+export type Options = {
+  babelOptions: babel.Options,
+  cliOptions: CLIOptions,
+};
+
+export default function parseArgv(args: Array<string>): Options {
   //
   commander.parse(args);
 
@@ -171,20 +195,67 @@ export default function parseArgv(args: Array<string>) {
     }
   });
 
-  if (commander.outDir && !filenames.length) {
+  const opts: Object = commander.opts();
+
+  const babelOptions: babel.Options = {
+    presets: opts.presets,
+    plugins: opts.plugins,
+    rootMode: opts.rootMode,
+    configFile: opts.configFile,
+    envName: opts.envName,
+    sourceType: opts.sourceType,
+    ignore: opts.ignore,
+    only: opts.only,
+    retainLines: opts.retainLines,
+    compact: opts.compact,
+    minified: opts.minified,
+    auxiliaryCommentBefore: opts.auxiliaryCommentBefore,
+    auxiliaryCommentAfter: opts.auxiliaryCommentAfter,
+    sourceMaps: opts.sourceMaps,
+    sourceFileName: opts.sourceFileName,
+    sourceRoot: opts.sourceRoot,
+    moduleRoot: opts.moduleRoot,
+    moduleIds: opts.moduleIds,
+    moduleId: opts.moduleId,
+
+    // Commander will default the "--no-" arguments to true, but we want to
+    // leave them undefined so that @babel/core can handle the
+    // default-assignment logic on its own.
+    babelrc: opts.babelrc === true ? undefined : opts.babelrc,
+    highlightCode: opts.highlightCode === true ? undefined : opts.highlightCode,
+    comments: opts.comments === true ? undefined : opts.comments,
+  };
+  const cliOptions: CLIOptions = {
+    filename: opts.filename,
+    filenames,
+    extensions: opts.extensions,
+    keepFileExtension: opts.keepFileExtension,
+    watch: opts.watch,
+    skipInitialBuild: opts.skipInitialBuild,
+    outFile: opts.outFile,
+    outDir: opts.outDir,
+    relative: opts.relative,
+    copyFiles: opts.copyFiles,
+    includeDotfiles: opts.includeDotfiles,
+    verbose: opts.verbose,
+    deleteDirOnStart: opts.deleteDirOnStart,
+    sourceMapTarget: opts.sourceMapTarget,
+  };
+
+  if (cliOptions.outDir && !cliOptions.filenames.length) {
     errors.push("--out-dir requires filenames");
   }
 
-  if (commander.outFile && commander.outDir) {
+  if (cliOptions.outFile && cliOptions.outDir) {
     errors.push("--out-file and --out-dir cannot be used together");
   }
 
-  if (commander.relative && !commander.outDir) {
+  if (cliOptions.relative && !cliOptions.outDir) {
     errors.push("--relative requires --out-dir usage");
   }
 
-  if (commander.watch) {
-    if (!commander.outFile && !commander.outDir) {
+  if (cliOptions.watch) {
+    if (!cliOptions.outFile && !cliOptions.outDir) {
       errors.push("--watch requires --out-file or --out-dir");
     }
 
@@ -193,18 +264,18 @@ export default function parseArgv(args: Array<string>) {
     }
   }
 
-  if (commander.skipInitialBuild && !commander.watch) {
+  if (cliOptions.skipInitialBuild && !cliOptions.watch) {
     errors.push("--skip-initial-build requires --watch");
   }
-  if (commander.deleteDirOnStart && !commander.outDir) {
+  if (cliOptions.deleteDirOnStart && !cliOptions.outDir) {
     errors.push("--delete-dir-on-start requires --out-dir");
   }
 
   if (
-    !commander.outDir &&
-    filenames.length === 0 &&
-    typeof commander.filename !== "string" &&
-    commander.babelrc !== false
+    !cliOptions.outDir &&
+    cliOptions.filenames.length === 0 &&
+    typeof cliOptions.filename !== "string" &&
+    babelOptions.babelrc !== false
   ) {
     errors.push(
       "stdin compilation requires either -f/--filename [filename] or --no-babelrc",
@@ -216,61 +287,16 @@ export default function parseArgv(args: Array<string>) {
     errors.forEach(function(e) {
       console.error("  " + e);
     });
-    process.exit(2);
+    throw 2;
   }
 
-  const opts = commander.opts();
-
   return {
-    babelOptions: {
-      presets: opts.presets,
-      plugins: opts.plugins,
-      rootMode: opts.rootMode,
-      configFile: opts.configFile,
-      envName: opts.envName,
-      sourceType: opts.sourceType,
-      ignore: opts.ignore,
-      only: opts.only,
-      retainLines: opts.retainLines,
-      compact: opts.compact,
-      minified: opts.minified,
-      auxiliaryCommentBefore: opts.auxiliaryCommentBefore,
-      auxiliaryCommentAfter: opts.auxiliaryCommentAfter,
-      sourceMaps: opts.sourceMaps,
-      sourceFileName: opts.sourceFileName,
-      sourceRoot: opts.sourceRoot,
-      moduleRoot: opts.moduleRoot,
-      moduleIds: opts.moduleIds,
-      moduleId: opts.moduleId,
-
-      // Commander will default the "--no-" arguments to true, but we want to
-      // leave them undefined so that @babel/core can handle the
-      // default-assignment logic on its own.
-      babelrc: opts.babelrc === true ? undefined : opts.babelrc,
-      highlightCode:
-        opts.highlightCode === true ? undefined : opts.highlightCode,
-      comments: opts.comments === true ? undefined : opts.comments,
-    },
-    cliOptions: {
-      filename: opts.filename,
-      filenames,
-      extensions: opts.extensions,
-      keepFileExtension: opts.keepFileExtension,
-      watch: opts.watch,
-      skipInitialBuild: opts.skipInitialBuild,
-      outFile: opts.outFile,
-      outDir: opts.outDir,
-      relative: opts.relative,
-      copyFiles: opts.copyFiles,
-      includeDotfiles: opts.includeDotfiles,
-      verbose: opts.verbose,
-      deleteDirOnStart: opts.deleteDirOnStart,
-      sourceMapTarget: opts.sourceMapTarget,
-    },
+    babelOptions,
+    cliOptions,
   };
 }
 
-function booleanify(val: any): boolean | any {
+function booleanify(val: mixed): boolean | any {
   if (val === "true" || val == 1) {
     return true;
   }
@@ -282,7 +308,7 @@ function booleanify(val: any): boolean | any {
   return val;
 }
 
-function collect(value, previousValue): Array<string> {
+function collect(value: string, previousValue: Array<string>): Array<string> {
   // If the user passed the option with no value, like "babel file.js --presets", do nothing.
   if (typeof value !== "string") return previousValue;
 

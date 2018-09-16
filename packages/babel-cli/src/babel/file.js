@@ -1,4 +1,7 @@
+// @flow
+
 import convertSourceMap from "convert-source-map";
+import * as babel from "@babel/core";
 import defaults from "lodash/defaults";
 import sourceMap from "source-map";
 import slash from "slash";
@@ -6,9 +9,10 @@ import path from "path";
 import fs from "fs";
 
 import * as util from "./util";
+import type { Options } from "./options";
 
-export default async function({ cliOptions, babelOptions }) {
-  function buildResult(fileResults) {
+export default async function({ cliOptions, babelOptions }: Options) {
+  function buildResult(fileResults: Array<babel.TransformResult | null>) {
     const map = new sourceMap.SourceMapGenerator({
       file:
         cliOptions.sourceMapTarget ||
@@ -22,6 +26,10 @@ export default async function({ cliOptions, babelOptions }) {
 
     for (const result of fileResults) {
       if (!result) continue;
+
+      if (typeof result.code !== "string") {
+        throw new Error("Assertion failure - code:string expected");
+      }
 
       code += result.code + "\n";
 
@@ -65,7 +73,7 @@ export default async function({ cliOptions, babelOptions }) {
       babelOptions.sourceMaps === "inline" ||
       (!cliOptions.outFile && babelOptions.sourceMaps)
     ) {
-      code += "\n" + convertSourceMap.fromObject(map).toComment();
+      code += "\n" + convertSourceMap.fromObject(map.toJSON()).toComment();
     }
 
     return {
@@ -74,7 +82,7 @@ export default async function({ cliOptions, babelOptions }) {
     };
   }
 
-  function output(fileResults) {
+  function output(fileResults: Array<babel.TransformResult | null>) {
     const result = buildResult(fileResults);
 
     if (cliOptions.outFile) {
@@ -91,7 +99,7 @@ export default async function({ cliOptions, babelOptions }) {
     }
   }
 
-  function readStdin() {
+  function readStdin(): Promise<string> {
     return new Promise((resolve, reject) => {
       let code = "";
 
@@ -99,7 +107,14 @@ export default async function({ cliOptions, babelOptions }) {
 
       process.stdin.on("readable", function() {
         const chunk = process.stdin.read();
-        if (chunk !== null) code += chunk;
+        if (chunk !== null) {
+          if (typeof chunk !== "string") {
+            throw new Error(
+              "Assertion failure - encoding should ensure string",
+            );
+          }
+          code += chunk;
+        }
       });
 
       process.stdin.on("end", function() {
@@ -126,7 +141,7 @@ export default async function({ cliOptions, babelOptions }) {
     output([res]);
   }
 
-  async function walk(filenames) {
+  async function walk(filenames: Array<string>) {
     const _filenames = [];
 
     filenames.forEach(function(filename) {
@@ -147,7 +162,9 @@ export default async function({ cliOptions, babelOptions }) {
     });
 
     const results = await Promise.all(
-      _filenames.map(async function(filename) {
+      _filenames.map(async function(
+        filename: string,
+      ): Promise<babel.TransformResult | null> {
         let sourceFilename = filename;
         if (cliOptions.outFile) {
           sourceFilename = path.relative(
@@ -188,7 +205,7 @@ export default async function({ cliOptions, babelOptions }) {
     output(results);
   }
 
-  async function files(filenames) {
+  async function files(filenames: Array<string>) {
     if (!cliOptions.skipInitialBuild) {
       await walk(filenames);
     }

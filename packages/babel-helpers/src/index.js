@@ -1,8 +1,10 @@
+// @flow
+
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 import helpers from "./helpers";
 
-function makePath(path) {
+function makePath(path): string {
   const parts = [];
 
   for (; path.parentPath; path = path.parentPath) {
@@ -13,11 +15,22 @@ function makePath(path) {
   return parts.reverse().join(".");
 }
 
+type HelperMetadata = {
+  globals: Array<string>,
+  localBindingNames: Array<string>,
+  dependencies: Map<BabelNodeIdentifier, string>,
+  exportBindingAssignments: Array<string>,
+  exportPath: Object | void,
+  exportName: string | void,
+  importBindingsReferences: Array<string>,
+  importPaths: Array<string>,
+};
+
 /**
  * Given a file AST for a given helper, get a bunch of metadata about it so that Babel can quickly render
  * the helper is whatever context it is needed in.
  */
-function getHelperMetadata(file) {
+function getHelperMetadata(file: BabelNodeFile): HelperMetadata {
   const globals = new Set();
   const localBindingNames = new Set();
   // Maps imported identifier -> helper name
@@ -134,12 +147,19 @@ function getHelperMetadata(file) {
 /**
  * Given a helper AST and information about how it will be used, update the AST to match the usage.
  */
-function permuteHelperAST(file, metadata, id, localBindings, getDependency) {
-  if (localBindings && !id) {
+function permuteHelperAST(
+  file: BabelNodeFile,
+  metadata: HelperMetadata,
+  maybeId: ?BabelNodeIdentifier,
+  localBindings: ?Array<string>,
+  getDependency: ?DependencyCallback,
+) {
+  if (localBindings && !maybeId) {
     throw new Error("Unexpected local bindings for module-based helpers.");
   }
 
-  if (!id) return;
+  if (!maybeId) return;
+  const id: BabelNodeIdentifier = maybeId;
 
   const {
     localBindingNames,
@@ -166,7 +186,11 @@ function permuteHelperAST(file, metadata, id, localBindings, getDependency) {
     if (newName !== name) toRename[name] = newName;
   });
 
-  if (id.type === "Identifier" && exportName !== id.name) {
+  if (
+    id.type === "Identifier" &&
+    typeof exportName === "string" &&
+    exportName !== id.name
+  ) {
     toRename[exportName] = id.name;
   }
 
@@ -226,15 +250,32 @@ function permuteHelperAST(file, metadata, id, localBindings, getDependency) {
   });
 }
 
-const helperData = Object.create(null);
-function loadHelper(name) {
-  if (!helperData[name]) {
+type Helper = {
+  build(
+    getDependency?: ?DependencyCallback,
+    id?: ?BabelNodeIdentifier,
+    localBindings?: ?Array<string>,
+  ): {
+    nodes: Array<BabelNodeStatement>,
+    globals: Array<string>,
+  },
+  minVersion(): string,
+  dependencies: Map<BabelNodeIdentifier, string>,
+};
+
+const helperData: { [string]: Helper } = (Object.create(null): any);
+function loadHelper(name: string): Helper {
+  let helperInstance = helperData[name];
+  if (!helperInstance) {
     const helper = helpers[name];
     if (!helper) {
-      throw Object.assign(new ReferenceError(`Unknown helper ${name}`), {
-        code: "BABEL_HELPER_UNKNOWN",
-        helper: name,
-      });
+      throw Object.assign(
+        (new ReferenceError(`Unknown helper ${name}`): Object),
+        {
+          code: "BABEL_HELPER_UNKNOWN",
+          helper: name,
+        },
+      );
     }
 
     const fn = () => {
@@ -243,7 +284,7 @@ function loadHelper(name) {
 
     const metadata = getHelperMetadata(fn());
 
-    helperData[name] = {
+    helperInstance = {
       build(getDependency, id, localBindings) {
         const file = fn();
         permuteHelperAST(file, metadata, id, localBindings, getDependency);
@@ -258,21 +299,24 @@ function loadHelper(name) {
       },
       dependencies: metadata.dependencies,
     };
+    helperData[name] = helperInstance;
   }
 
-  return helperData[name];
+  return helperInstance;
 }
 
+type DependencyCallback = string => ?BabelNodeExpression;
+
 export function get(
-  name,
-  getDependency?: string => ?t.Expression,
-  id?,
-  localBindings?: string[],
+  name: string,
+  getDependency?: ?DependencyCallback,
+  id?: ?BabelNodeIdentifier,
+  localBindings?: ?Array<string>,
 ) {
   return loadHelper(name).build(getDependency, id, localBindings);
 }
 
-export function minVersion(name: string) {
+export function minVersion(name: string): string {
   return loadHelper(name).minVersion();
 }
 
@@ -280,8 +324,6 @@ export function getDependencies(name: string): $ReadOnlyArray<string> {
   return Array.from(loadHelper(name).dependencies.values());
 }
 
-export const list = Object.keys(helpers)
-  .map(name => name.replace(/^_/, ""))
-  .filter(name => name !== "__esModule");
+export const list: Array<string> = Object.keys(helpers);
 
 export default get;

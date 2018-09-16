@@ -2,7 +2,12 @@
 
 import template from "@babel/template";
 
-const helpers = Object.create(null);
+type HelperTemplate = {
+  minVersion: string,
+  ast: () => BabelNodeProgram,
+};
+
+const helpers: { [string]: HelperTemplate } = (Object.create(null): any);
 export default helpers;
 
 const helper = (minVersion: string) => tpl => ({

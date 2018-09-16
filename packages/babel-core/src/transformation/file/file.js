@@ -226,7 +226,7 @@ export default class File {
     });
 
     nodes.forEach(node => {
-      node._compact = true;
+      (node: any)._compact = true;
     });
 
     this.path.unshiftContainer("body", nodes);

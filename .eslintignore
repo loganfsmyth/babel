@@ -1,6 +1,7 @@
 /lib
 /build
 /.git
+/flow-typed
 package.json
 lerna.json
 packages/babel-runtime

@@ -27,9 +27,59 @@ declare module "lodash/defaults" {
 declare module "lodash/clone" {
   declare export default <T>(obj: T) => T;
 }
-
+declare module "lodash/cloneDeep" {
+  declare export default <T>(obj: T) => T;
+}
+declare module "lodash/escapeRegExp" {
+  declare export default (obj: string) => string;
+}
 declare module "lodash/merge" {
   declare export default <T: Object>(T, Object) => T;
+}
+declare module "pirates" {
+  declare export type Hook = (code: string, filename: string) => string;
+  declare export type RevertHook = () => mixed;
+  declare export type Options = {
+    extensions?: ?Array<string>,
+    extension?: ?Array<string>,
+    exts?: ?Array<string>,
+    ext?: ?Array<string>,
+    ignoreNodeModules?: ?boolean,
+    matcher?: ?(filepath: string) => boolean,
+  };
+
+  declare export function addHook(hook: Hook, opts?: Options): RevertHook
+}
+declare module "source-map-support" {
+  declare type RetrievedMap = {
+    url: ?string,
+    map: string | Object,
+  };
+
+  declare type Options = {
+    environment?: string,
+    handleUncaughtExceptions?: boolean,
+    retrieveFile?: (filepath: string) => ?string,
+    overrideRetrieveFile?: boolean,
+    retrieveSourceMap?: (source: string) => ?RetrievedMap,
+    overrideRetrieveSourceMap?: boolean,
+    hookRequire?: boolean,
+    emptyCacheBetweenOperations?: boolean,
+  };
+
+  declare module.exports: {
+    install(opts?: ?Options): void,
+  };
+}
+
+declare module "find-cache-dir" {
+  declare module.exports: {
+    ({ name: string }): string,
+  };
+}
+
+declare module "home-or-tmp" {
+  declare module.exports: string;
 }
 
 declare module "esutils" {

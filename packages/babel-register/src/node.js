@@ -1,3 +1,4 @@
+// @flow
 import deepClone from "lodash/cloneDeep";
 import sourceMapSupport from "source-map-support";
 import * as registerCache from "./cache";
@@ -8,35 +9,44 @@ import { addHook } from "pirates";
 import fs from "fs";
 import path from "path";
 
-const maps = {};
-let transformOpts = {};
+const maps: {
+  [string]: Object,
+} = {};
+let transformOpts: babel.Options = {};
 let piratesRevert = null;
 
 function installSourceMapSupport() {
   sourceMapSupport.install({
     handleUncaughtExceptions: false,
     environment: "node",
-    retrieveSourceMap(source) {
+    retrieveSourceMap(source: string) {
       const map = maps && maps[source];
       if (map) {
         return {
           url: null,
           map: map,
         };
-      } else {
-        return null;
       }
+      return null;
     },
   });
 }
 
-let cache;
+let cache: ?{
+  [string]: {
+    result: {
+      code: string,
+      map: ?Object,
+    } | null,
+    mtime: number,
+  },
+};
 
-function mtime(filename) {
+function mtime(filename: string): number {
   return +fs.statSync(filename).mtime;
 }
 
-function compile(code, filename) {
+function compile(code: string, filename: string): string {
   // merge in base options and resolve all the plugins and presets relative to this file
   const opts = new OptionManager().init(
     // sourceRoot can be overwritten
@@ -52,38 +62,53 @@ function compile(code, filename) {
 
   let cacheKey = `${JSON.stringify(opts)}:${babel.version}`;
 
-  const env = babel.getEnv(false);
+  const env = babel.getEnv();
 
   if (env) cacheKey += `:${env}`;
 
-  let cached = cache && cache[cacheKey];
+  const mtimeKey = cache ? mtime(filename) : 0;
+  const cached = cache ? cache[cacheKey] : null;
 
-  if (!cached || cached.mtime !== mtime(filename)) {
-    cached = babel.transform(code, {
+  let result = null;
+  if (cached && cached.mtime === mtimeKey) {
+    result = cached.result;
+  } else {
+    const output = babel.transformSync(code, {
       ...opts,
       sourceMaps: opts.sourceMaps === undefined ? "both" : opts.sourceMaps,
       ast: false,
     });
-
-    if (cache) {
-      cache[cacheKey] = cached;
-      cached.mtime = mtime(filename);
+    if (output) {
+      if (typeof output.code !== "string") {
+        throw new Error("Assertion failure - expected output code");
+      }
+      result = {
+        code: output.code,
+        map: output.map,
+      };
     }
   }
 
-  if (cached.map) {
+  if (cache) {
+    cache[cacheKey] = {
+      result,
+      mtime: mtimeKey,
+    };
+  }
+
+  if (result && result.map) {
     if (Object.keys(maps).length === 0) {
       installSourceMapSupport();
     }
-    maps[filename] = cached.map;
+    maps[filename] = result.map;
   }
 
-  return cached.code;
+  return result ? result.code : code;
 }
 
 let compiling = false;
 
-function compileHook(code, filename) {
+function compileHook(code: string, filename: string): string {
   if (compiling) return code;
 
   try {
@@ -94,7 +119,7 @@ function compileHook(code, filename) {
   }
 }
 
-function hookExtensions(exts) {
+function hookExtensions(exts: Array<string>) {
   if (piratesRevert) piratesRevert();
   piratesRevert = addHook(compileHook, { exts, ignoreNodeModules: false });
 }
@@ -105,44 +130,42 @@ export function revert() {
 
 register();
 
-export default function register(opts?: Object = {}) {
-  // Clone to avoid mutating the arguments object with the 'delete's below.
-  opts = {
-    ...opts,
-  };
-  hookExtensions(opts.extensions || DEFAULT_EXTENSIONS);
+type Options = babel.Options & {
+  extensions?: ?Array<string>,
+  cache?: boolean,
+};
 
-  if (opts.cache === false && cache) {
+export default function register(opts?: Options = {}) {
+  const { extensions, cache: cacheEnabled, ...babelOptions } = opts;
+
+  hookExtensions(extensions || DEFAULT_EXTENSIONS);
+
+  if (cacheEnabled === false && cache) {
     registerCache.clear();
     cache = null;
-  } else if (opts.cache !== false && !cache) {
+  } else if (cacheEnabled !== false && !cache) {
     registerCache.load();
     cache = registerCache.get();
   }
 
-  delete opts.extensions;
-  delete opts.cache;
-
-  transformOpts = {
-    ...opts,
-    caller: {
-      name: "@babel/register",
-      ...(opts.caller || {}),
-    },
-  };
-
-  let { cwd = "." } = transformOpts;
-
   // Ensure that the working directory is resolved up front so that
   // things don't break if it changes later.
-  cwd = transformOpts.cwd = path.resolve(cwd);
+  const cwd = path.resolve(
+    babelOptions.cwd === undefined ? "." : babelOptions.cwd,
+  );
 
-  if (transformOpts.ignore === undefined && transformOpts.only === undefined) {
-    transformOpts.only = [
+  babelOptions.cwd = cwd;
+  babelOptions.caller = {
+    name: "@babel/register",
+    ...(babelOptions.caller || {}),
+  };
+
+  if (babelOptions.ignore === undefined && babelOptions.only === undefined) {
+    babelOptions.only = [
       // Only compile things inside the current working directory.
       new RegExp("^" + escapeRegExp(cwd), "i"),
     ];
-    transformOpts.ignore = [
+    babelOptions.ignore = [
       // Ignore any node_modules inside the current working directory.
       new RegExp(
         "^" +
@@ -155,4 +178,6 @@ export default function register(opts?: Object = {}) {
       ),
     ];
   }
+
+  transformOpts = babelOptions;
 }

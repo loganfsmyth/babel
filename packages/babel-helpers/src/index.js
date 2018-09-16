@@ -249,16 +249,16 @@ function permuteHelperAST(
     },
   });
 }
-
+type BuildResult = {
+  nodes: Array<BabelNodeStatement>,
+  globals: Array<string>,
+};
 type Helper = {
   build(
     getDependency?: ?DependencyCallback,
     id?: ?BabelNodeIdentifier,
     localBindings?: ?Array<string>,
-  ): {
-    nodes: Array<BabelNodeStatement>,
-    globals: Array<string>,
-  },
+  ): BuildResult,
   minVersion(): string,
   dependencies: Map<BabelNodeIdentifier, string>,
 };
@@ -312,7 +312,7 @@ export function get(
   getDependency?: ?DependencyCallback,
   id?: ?BabelNodeIdentifier,
   localBindings?: ?Array<string>,
-) {
+): BuildResult {
   return loadHelper(name).build(getDependency, id, localBindings);
 }
 

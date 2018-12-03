@@ -3,13 +3,18 @@
 import BaseParser from "./base";
 import type { Comment, Node } from "../types";
 import { types as tt } from "../tokenizer/types";
+import type { Position } from "../util/location";
+import type { TokenType } from "../tokenizer/types";
 
 export type TokenTreeItem = {
   type: "",
+  tokType: TokenType,
   start: number,
   end: number,
-  groupEnd: boolean,
-  permeable: boolean,
+  loc: {
+    start: Position,
+    end: Position,
+  },
 };
 
 export default class CommentsParser extends BaseParser {
@@ -20,23 +25,17 @@ export default class CommentsParser extends BaseParser {
   }
 
   processTokenOnFinish(): void {
-    const { commentTokenTree, start, end, type } = this.state;
+    const { commentTokenTree, start, end, startLoc, endLoc, type } = this.state;
 
     commentTokenTree.push({
       type: "",
+      tokType: type,
       start,
       end,
-
-      // We treat commas and semicolons as "permeable" so that comments that
-      // come _after_ commas and semicolons are allowed to attach to nodes
-      // that come immediately before them.
-      permeable: type === tt.comma || type === tt.semi,
-
-      // We mark right-hand closing tokens as group end tokens so that any
-      // comments between nodes and these tokens automatically count as
-      // trailing comments.
-      groupEnd:
-        type === tt.bracketR || type === tt.braceR || type === tt.parenR,
+      loc: {
+        start: startLoc,
+        end: endLoc,
+      },
     });
   }
 
@@ -74,14 +73,13 @@ export default class CommentsParser extends BaseParser {
 
       const {
         maxEnd = node.end,
-        requireSameLine,
+        maxLine = Infinity,
       } = this._buildTrailingCommentMetadata(child, children, i);
 
       while (
         commentIndex < commentQueue.length &&
         commentQueue[commentIndex].end <= maxEnd &&
-        (!requireSameLine ||
-          commentQueue[commentIndex].loc.start.line <= child.loc.end.line)
+        commentQueue[commentIndex].loc.start.line <= maxLine
       ) {
         child.trailingComments = child.trailingComments || [];
         child.trailingComments.push(commentQueue[commentIndex]);
@@ -181,7 +179,7 @@ export default class CommentsParser extends BaseParser {
     childIndex: number,
   ): {
     maxEnd: number | void,
-    requireSameLine?: boolean,
+    maxLine: number | void,
   } {
     let nextSiblingNode = null;
     const nextSiblingTokens = [];
@@ -203,51 +201,66 @@ export default class CommentsParser extends BaseParser {
       };
     }
 
-    // If there is a groupEnd token in the mix, any comment before the
-    // groupEnd sibling needs to be a trailing comment on this node.
-    for (let j = nextSiblingTokens.length - 1; j >= 0; j--) {
-      const token = nextSiblingTokens[j];
-      if (token.groupEnd) {
-        // Take _all_ comments before group end
-        return {
-          maxEnd: token.start,
-        };
-      }
-    }
+    const tok = nextSiblingTokens[0];
+    const nextTok = nextSiblingTokens[1];
 
-    if (child.loc.end.line === nextSiblingNode.loc.start.line) {
-      return {
-        maxEnd:
-          nextSiblingTokens.length > 0
-            ? // When this node and the next are on the same line, we only take
-              // comments that are before any other tokens, leaving the rest to
-              // be leadingComments on the next sibling.
-              nextSiblingTokens[0].start
-            : // Use the child end as an easy way to bail out and not collect
-              // any comments. Any before the child end will have already been
-              // processed by earlier iterations.
-              child.end,
-      };
-    }
+    const permeableFirstToken =
+      tok && (tok.tokType === tt.comma || tok.tokType === tt.semi);
 
-    let maxEnd;
-    if (
-      nextSiblingTokens.length === 0 ||
-      (nextSiblingTokens.length === 1 && nextSiblingTokens[0].permeable)
-    ) {
-      // Pass through any permeable sibling token in the simple case.
-      maxEnd = nextSiblingNode.start;
-    } else if (nextSiblingTokens[0].permeable) {
-      // Reach through the first permeable token.
-      maxEnd = nextSiblingTokens[1].start;
-    } else {
-      // Stop at the very first token if it isn't permeable.
-      maxEnd = nextSiblingTokens[0].start;
-    }
+    const firstItem = permeableFirstToken ? tok : child;
+    const nextItem = nextTok || nextSiblingNode;
 
-    return {
-      maxEnd,
-      requireSameLine: true,
-    };
+    const maxEnd =
+      firstItem.loc.end.line === nextItem.loc.start.line
+        ? firstItem.end
+        : nextItem.start;
+
+    const maxLine =
+      firstItem.loc.end.line === nextItem.loc.start.line
+        ? undefined
+        : firstItem.loc.end.line;
+    return { maxEnd, maxLine };
+
+    // if (nextSiblingTokens.length === 0) {
+    //   if (child.loc.end.line === nextSiblingNode.loc.start.line) {
+    //     // Use the child end as an easy way to bail out and not collect
+    //     // any comments. If they are on the same line, all comments
+    //     // will become leading comments on the next sibling instead.
+    //     return {
+    //       maxEnd: child.end,
+    //     };
+    //   } else {
+    //     // Take any trailing comments that start on the same line
+    //     // that the child itself ends on.
+    //     return {
+    //       maxEnd: nextSiblingNode.start,
+    //       maxLine: child.loc.end.line,
+    //     };
+    //   }
+    // }
+    // const tok = nextSiblingTokens[0];
+    // if (!(tok.tokType === tt.comma || tok.tokType === tt.semi)) {
+    //   return {
+    //     // Accept any commments between the node and the next token.
+    //     maxEnd: tok.start,
+    //   };
+    // }
+    // if (nextSiblingTokens.length === 1) {
+    //   if (tok.loc.start.line === nextSiblingNode.loc.start.line) {
+    //     return {
+    //       maxEnd: tok.start,
+    //     };
+    //   }
+    //
+    //   return {
+    //     maxEnd: nextSiblingNode.start,
+    //     maxLine: tok.loc.start.line,
+    //   };
+    // }
+    // const nextTok = nextSiblingTokens[1];
+    // return {
+    //   maxEnd: nextTok.start,
+    //   maxLine: tok.loc.start.line,
+    // };
   }
 }
